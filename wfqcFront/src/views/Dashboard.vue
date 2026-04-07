@@ -1,51 +1,37 @@
-<!-- src/views/Dashboard.vue -->
 <template>
-  <div class="dashboard">
-    <h1>欢迎回来！</h1>
-    <p>你已成功登录</p>
-    <button @click="handleLogout" class="logout-btn">退出登录</button>
+  <div class="dashboard-container">
+    <HeaderBar />
+    <div class="dashboard-body">
+      <SidebarMenu @menu-select="handleMenuSelect" />
+      <ContentArea :active-menu="activeMenu" />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { ref } from 'vue'
+import HeaderBar from '@/components/HeaderBar.vue'
+import SidebarMenu from '@/components/SidebarMenu.vue'
+import ContentArea from '@/components/ContentArea.vue'
 
-const router = useRouter()
-const authStore = useAuthStore()
+const activeMenu = ref('personnel')
 
-const handleLogout = async () => {
-  await authStore.logout()
-  router.push('/login')
+const handleMenuSelect = (menu) => {
+  activeMenu.value = menu
 }
 </script>
 
 <style scoped>
-.dashboard {
+.dashboard-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  background: #f5f5f5;
+  height: 100vh;
+  overflow: hidden;
 }
 
-h1 {
-  color: #333;
-  margin-bottom: 16px;
-}
-
-.logout-btn {
-  margin-top: 24px;
-  padding: 10px 24px;
-  background: #e53e3e;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.logout-btn:hover {
-  background: #c53030;
+.dashboard-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 </style>

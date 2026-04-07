@@ -7,7 +7,8 @@ export const authApi = {
     return request({
       url: '/auth/login',
       method: 'post',
-      data
+      data,
+      returnFullResponse: true
     })
   },
   
@@ -16,7 +17,8 @@ export const authApi = {
     return request({
       url: '/auth/login-Captcha',
       method: 'post',
-      data
+      data,
+      returnFullResponse: true
     })
   },
   

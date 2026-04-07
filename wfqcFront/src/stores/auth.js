@@ -7,12 +7,14 @@ export const useAuthStore = defineStore('auth', {
     user: null,
     userId: null,
     isLoggedIn: false,
-    tokenExpireTimer: null
+    tokenExpireTimer: null,
+    accessToken: null
   }),
   
   getters: {
     isAuthenticated: (state) => state.isLoggedIn,
-    currentUser: (state) => state.user
+    currentUser: (state) => state.user,
+    token: (state) => state.accessToken
   },
   
   actions: {
@@ -26,6 +28,16 @@ export const useAuthStore = defineStore('auth', {
         if (res.success) {
           this.userId = res.data?.user_id
           this.isLoggedIn = true
+          
+          // 从响应头中获取Authorization token
+          if (res.headers) {
+            const authorization = res.headers.authorization || res.headers.Authorization
+            if (authorization) {
+              this.accessToken = authorization
+              sessionStorage.setItem('accessToken', authorization)
+            }
+          }
+          
           this.startTokenExpireTimer()
           
           // 可选：将 userId 存储到 sessionStorage 作为备份标识
@@ -42,6 +54,11 @@ export const useAuthStore = defineStore('auth', {
     },
     // 初始化认证状态（异步验证 refresh token）
     async initAuth() {
+      // 从 sessionStorage 恢复 accessToken
+      const savedToken = sessionStorage.getItem('accessToken')
+      if (savedToken) {
+        this.accessToken = savedToken
+      }
       // 调用接口验证 refresh token 是否有效
       const isAuthenticated = await this.verifyRefreshToken()
       return isAuthenticated
@@ -87,11 +104,22 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     
+    // 更新Token（从响应拦截器调用）
+    updateToken(newToken) {
+      if (newToken) {
+        this.accessToken = newToken
+        sessionStorage.setItem('accessToken', newToken)
+        console.log('Token已更新:', newToken)
+      }
+    },
+    
     // 清除认证状态
     clearAuthState() {
       this.user = null
       this.userId = null
       this.isLoggedIn = false
+      this.accessToken = null
+      sessionStorage.removeItem('accessToken')
       if (this.tokenExpireTimer) {
         clearTimeout(this.tokenExpireTimer)
         this.tokenExpireTimer = null

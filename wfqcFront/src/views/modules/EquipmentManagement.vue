@@ -24,38 +24,27 @@
     </div>
     
     <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column label="所属项目" width="150">
+      <el-table-column 
+        v-for="column in tableColumns" 
+        :key="column.prop"
+        :prop="column.prop"
+        :label="column.label"
+        :width="column.width"
+        :fixed="column.fixed"
+      >
         <template #default="scope">
-          {{ getProjectName(scope.row.project_id) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="device_name" label="设备名称" width="180" />
-      <el-table-column prop="device_type" label="设备类型" width="120" />
-      <el-table-column label="设备状态" width="120">
-        <template #default="scope">
-          <el-tag :type="getDeviceStatusType(scope.row.device_status)">
-            {{ getDeviceStatusText(scope.row.device_status) }}
+          <el-tag 
+            v-if="column.tagType" 
+            :type="column.tagType(scope.row[column.prop])"
+          >
+            {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
           </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="device_location" label="设备位置" width="150" />
-      <el-table-column label="运行时间" width="120">
-        <template #default="scope">
-          {{ scope.row.running_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="battery" label="电量(%)" width="100" />
-      <el-table-column prop="temperature" label="温度(°C)" width="120" />
-      <el-table-column label="报警状态" width="120">
-        <template #default="scope">
-          <el-tag :type="scope.row.alarm_status === 1 ? 'danger' : 'success'">
-            {{ scope.row.alarm_status === 1 ? '是' : '否' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="上次维护" width="120">
-        <template #default="scope">
-          {{ scope.row.last_maintenance_time || '-' }}
+          <span v-else-if="column.formatter">
+            {{ column.formatter(scope.row) }}
+          </span>
+          <span v-else>
+            {{ scope.row[column.prop] || '-' }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="操作" fixed="right" width="200">
@@ -83,61 +72,45 @@
       width="600px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="所属项目" prop="project_id">
-          <el-select v-model="form.project_id" placeholder="请选择项目" style="width: 100%;">
-            <el-option
-              v-for="proj in projectList"
-              :key="proj.project_id"
-              :label="proj.project_name"
-              :value="proj.project_id"
+        <el-form-item 
+          v-for="field in formFields" 
+          :key="field.prop"
+          :label="field.label" 
+          :prop="field.prop"
+        >
+          <el-input 
+            v-if="field.type === 'input'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+          />
+          <el-select 
+            v-else-if="field.type === 'select'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+            style="width: 100%;"
+          >
+            <el-option 
+              v-for="item in (field.optionsKey === 'projectList' ? projectList : field.options)" 
+              :key="item[field.optionValue || 'value']"
+              :label="item[field.optionLabel || 'label']" 
+              :value="item[field.optionValue || 'value']" 
             />
           </el-select>
-        </el-form-item>
-        <el-form-item label="设备名称" prop="device_name">
-          <el-input v-model="form.device_name" placeholder="请输入设备名称" />
-        </el-form-item>
-        <el-form-item label="设备类型" prop="device_type">
-          <el-input v-model="form.device_type" placeholder="请输入设备类型" />
-        </el-form-item>
-        <el-form-item label="设备状态" prop="device_status">
-          <el-select v-model="form.device_status" placeholder="请选择设备状态" style="width: 100%;">
-            <el-option label="闲置" :value="0" />
-            <el-option label="使用中" :value="1" />
-            <el-option label="维修中" :value="2" />
-            <el-option label="报废" :value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="设备位置" prop="device_location">
-          <el-input v-model="form.device_location" placeholder="请输入设备位置" />
-        </el-form-item>
-        <el-form-item label="运行时间" prop="running_time">
           <el-date-picker
-            v-model="form.running_time"
-            type="date"
-            placeholder="请选择运行时间"
+            v-else-if="field.type === 'date'"
+            v-model="form[field.prop]"
+            :type="field.dateType || 'date'"
+            :placeholder="field.placeholder"
             style="width: 100%;"
-            value-format="YYYY-MM-DD"
+            :value-format="field.valueFormat || 'YYYY-MM-DD'"
           />
-        </el-form-item>
-        <el-form-item label="电量(%)" prop="battery">
-          <el-input-number v-model="form.battery" :min="0" :max="100" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item label="温度(°C)" prop="temperature">
-          <el-input-number v-model="form.temperature" :precision="1" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item label="报警状态" prop="alarm_status">
-          <el-select v-model="form.alarm_status" placeholder="请选择报警状态" style="width: 100%;">
-            <el-option label="否" :value="0" />
-            <el-option label="是" :value="1" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="上次维护" prop="last_maintenance_time">
-          <el-date-picker
-            v-model="form.last_maintenance_time"
-            type="date"
-            placeholder="请选择上次维护时间"
-            style="width: 100%;"
-            value-format="YYYY-MM-DD"
+          <el-input-number
+            v-else-if="field.type === 'number'"
+            v-model="form[field.prop]" 
+            :min="field.min || 0" 
+            :max="field.max" 
+            :precision="field.precision" 
+            style="width: 100%;" 
           />
         </el-form-item>
       </el-form>
@@ -156,6 +129,183 @@ import { Plus, Refresh } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { projectApi } from '@/api/project'
 
+// ==================== 配置常量区域 ====================
+
+const DEVICE_STATUS_CONFIG = {
+  0: { label: '正常', type: 'success' },
+  1: { label: '离线', type: 'info' },
+  2: { label: '异常', type: 'danger' }
+  // 0: { label: '闲置', type: 'info' },
+  // 1: { label: '使用中', type: 'success' },
+  // 2: { label: '维修中', type: 'warning' },
+  // 3: { label: '报废', type: 'danger' }
+}
+
+const ALARM_STATUS_CONFIG = {
+  0: { label: '正常', type: 'success' },
+  1: { label: '告警', type: 'danger' }
+}
+
+const deviceStatusOptions = Object.entries(DEVICE_STATUS_CONFIG).map(([value, config]) => ({
+  value: Number(value),
+  label: config.label
+}))
+
+const alarmStatusOptions = [
+  { value: 0, label: '正常' },
+  { value: 1, label: '告警' }
+]
+
+const tableColumns = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    width: '150',
+    formatter: (row, projectList) => getProjectName(row.project_id, projectList)
+  },
+  { prop: 'device_name', label: '设备名称', width: '180' },
+  { prop: 'device_type', label: '设备类型', width: '120' },
+  { 
+    prop: 'device_status', 
+    label: '设备状态', 
+    width: '120',
+    tagType: (val) => DEVICE_STATUS_CONFIG[val]?.type || 'info',
+    formatter: (row) => DEVICE_STATUS_CONFIG[row.device_status]?.label || '未知'
+  },
+  { prop: 'device_location', label: '设备位置', width: '150' },
+  { 
+    prop: 'running_time', 
+    label: '运行时间', 
+    width: '120',
+    formatter: (row) => row.running_time || '-'
+  },
+  { prop: 'battery', label: '电量(%)', width: '100' },
+  { prop: 'temperature', label: '温度(°C)', width: '120' },
+  { 
+    prop: 'alarm_status', 
+    label: '报警状态', 
+    width: '120',
+    tagType: (val) => ALARM_STATUS_CONFIG[val]?.type || 'info',
+    formatter: (row) => ALARM_STATUS_CONFIG[row.alarm_status]?.label || '未知'
+  },
+  { 
+    prop: 'last_maintenance_time', 
+    label: '上次维护', 
+    width: '120',
+    formatter: (row) => row.last_maintenance_time || '-'
+  }
+]
+
+const formFields = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    type: 'select', 
+    placeholder: '请选择项目',
+    optionsKey: 'projectList',
+    optionLabel: 'project_name',
+    optionValue: 'project_id',
+    required: true
+  },
+  { 
+    prop: 'device_name', 
+    label: '设备名称', 
+    type: 'input', 
+    placeholder: '请输入设备名称',
+    required: true
+  },
+  { 
+    prop: 'device_type', 
+    label: '设备类型', 
+    type: 'input', 
+    placeholder: '请输入设备类型'
+  },
+  { 
+    prop: 'device_status', 
+    label: '设备状态', 
+    type: 'select', 
+    placeholder: '请选择设备状态',
+    options: deviceStatusOptions
+  },
+  { 
+    prop: 'device_location', 
+    label: '设备位置', 
+    type: 'input', 
+    placeholder: '请输入设备位置'
+  },
+  { 
+    prop: 'running_time', 
+    label: '运行时间', 
+    type: 'date', 
+    placeholder: '请选择运行时间',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD'
+  },
+  { 
+    prop: 'battery', 
+    label: '电量(%)', 
+    type: 'number', 
+    min: 0,
+    max: 100,
+    placeholder: '请输入电量'
+  },
+  { 
+    prop: 'temperature', 
+    label: '温度(°C)', 
+    type: 'number', 
+    precision: 1,
+    placeholder: '请输入温度'
+  },
+  { 
+    prop: 'alarm_status', 
+    label: '报警状态', 
+    type: 'select', 
+    placeholder: '请选择报警状态',
+    options: alarmStatusOptions
+  },
+  { 
+    prop: 'last_maintenance_time', 
+    label: '上次维护', 
+    type: 'date', 
+    placeholder: '请选择上次维护时间',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD'
+  }
+]
+
+const generateRules = () => {
+  const rules = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      rules[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+    }
+  })
+  return rules
+}
+
+const getInitialFormData = () => {
+  const formData = { device_id: '' }
+  formFields.forEach(field => {
+    if (field.type === 'number') {
+      formData[field.prop] = field.min || 0
+    } else if (field.type === 'select') {
+      formData[field.prop] = field.options ? field.options[0]?.value : ''
+    } else {
+      formData[field.prop] = ''
+    }
+  })
+  return formData
+}
+
+// ==================== 辅助函数 ====================
+
+const getProjectName = (projectId, projectList) => {
+  const project = projectList?.find(p => p.project_id === projectId)
+  return project ? project.project_name : '-'
+}
+
+// ==================== 响应式数据 ====================
+
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
@@ -167,24 +317,10 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
-const form = ref({
-  device_id: '',
-  project_id: '',
-  device_name: '',
-  device_type: '',
-  device_status: 0,
-  device_location: '',
-  running_time: '',
-  battery: 0,
-  temperature: 0,
-  alarm_status: 0,
-  last_maintenance_time: ''
-})
+const form = ref(getInitialFormData())
+const rules = generateRules()
 
-const rules = {
-  project_id: [{ required: true, message: '请选择项目', trigger: 'change' }],
-  device_name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }]
-}
+// ==================== API 调用 ====================
 
 const loadProjects = async () => {
   try {
@@ -195,21 +331,6 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
-}
-
-const getProjectName = (projectId) => {
-  const project = projectList.value.find(p => p.project_id === projectId)
-  return project ? project.project_name : '-'
-}
-
-const getDeviceStatusType = (status) => {
-  const statusMap = { 0: 'info', 1: 'success', 2: 'warning', 3: 'danger' }
-  return statusMap[status] || 'info'
-}
-
-const getDeviceStatusText = (status) => {
-  const statusMap = { 0: '闲置', 1: '使用中', 2: '维修中', 3: '报废' }
-  return statusMap[status] || '未知'
 }
 
 const loadData = async () => {
@@ -238,19 +359,8 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = {
-    device_id: '',
-    project_id: selectedProjectId.value || '',
-    device_name: '',
-    device_type: '',
-    device_status: 0,
-    device_location: '',
-    running_time: '',
-    battery: 0,
-    temperature: 0,
-    alarm_status: 0,
-    last_maintenance_time: ''
-  }
+  const initialForm = getInitialFormData()
+  form.value = { ...initialForm, project_id: selectedProjectId.value || '' }
   dialogVisible.value = true
 }
 

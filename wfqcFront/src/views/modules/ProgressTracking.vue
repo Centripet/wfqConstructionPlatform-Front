@@ -23,46 +23,34 @@
     </div>
     
     <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column label="所属项目" width="150">
+      <el-table-column 
+        v-for="column in tableColumns" 
+        :key="column.prop"
+        :prop="column.prop"
+        :label="column.label"
+        :width="column.width"
+        :fixed="column.fixed"
+      >
         <template #default="scope">
-          {{ getProjectName(scope.row.project_id) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="task_name" label="任务名称" width="200" />
-      <el-table-column label="计划开始" width="120">
-        <template #default="scope">
-          {{ scope.row.plan_start_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="计划结束" width="120">
-        <template #default="scope">
-          {{ scope.row.plan_end_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="实际开始" width="120">
-        <template #default="scope">
-          {{ scope.row.actual_start_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="实际结束" width="120">
-        <template #default="scope">
-          {{ scope.row.actual_end_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="进度(%)" width="100">
-        <template #default="scope">
-          <el-progress :percentage="scope.row.progress_percentage || 0" :stroke-width="10" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="responsible_person" label="负责人" width="120" />
-      <el-table-column prop="status" label="状态" width="100">
-        <template #default="scope">
-          <el-tag :type="getTaskStatusType(scope.row.status)">
-            {{ scope.row.status || '进行中' }}
+          <el-progress 
+            v-if="column.type === 'progress'" 
+            :percentage="scope.row[column.prop] || 0" 
+            :stroke-width="10" 
+          />
+          <el-tag 
+            v-else-if="column.tagType" 
+            :type="column.tagType(scope.row[column.prop])"
+          >
+            {{ scope.row[column.prop] || '-' }}
           </el-tag>
+          <span v-else-if="column.formatter">
+            {{ column.formatter(scope.row) }}
+          </span>
+          <span v-else>
+            {{ scope.row[column.prop] || '-' }}
+          </span>
         </template>
       </el-table-column>
-      <el-table-column prop="lag_reason" label="滞后原因" show-overflow-tooltip />
       <el-table-column label="操作" fixed="right" width="200">
         <template #default="scope">
           <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
@@ -88,66 +76,53 @@
       width="600px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="所属项目" prop="project_id">
-          <el-select v-model="form.project_id" placeholder="请选择项目" style="width: 100%;">
-            <el-option
-              v-for="proj in projectList"
-              :key="proj.project_id"
-              :label="proj.project_name"
-              :value="proj.project_id"
+        <el-form-item 
+          v-for="field in formFields" 
+          :key="field.prop"
+          :label="field.label" 
+          :prop="field.prop"
+        >
+          <el-input 
+            v-if="field.type === 'input'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+          />
+          <el-select 
+            v-else-if="field.type === 'select'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+            style="width: 100%;"
+          >
+            <el-option 
+              v-for="item in (field.optionsKey === 'projectList' ? projectList : field.options)" 
+              :key="item[field.optionValue || 'value']"
+              :label="item[field.optionLabel || 'label']" 
+              :value="item[field.optionValue || 'value']" 
             />
           </el-select>
-        </el-form-item>
-        <el-form-item label="任务名称" prop="task_name">
-          <el-input v-model="form.task_name" placeholder="请输入任务名称" />
-        </el-form-item>
-        <el-form-item label="计划开始" prop="plan_start_time">
           <el-date-picker
-            v-model="form.plan_start_time"
-            type="date"
-            placeholder="请选择计划开始日期"
+            v-else-if="field.type === 'date'"
+            v-model="form[field.prop]"
+            :type="field.dateType || 'date'"
+            :placeholder="field.placeholder"
             style="width: 100%;"
-            value-format="YYYY-MM-DD"
+            :value-format="field.valueFormat || 'YYYY-MM-DD'"
           />
-        </el-form-item>
-        <el-form-item label="计划结束" prop="plan_end_time">
-          <el-date-picker
-            v-model="form.plan_end_time"
-            type="date"
-            placeholder="请选择计划结束日期"
-            style="width: 100%;"
-            value-format="YYYY-MM-DD"
+          <el-input-number
+            v-else-if="field.type === 'number'"
+            v-model="form[field.prop]" 
+            :min="field.min || 0" 
+            :max="field.max" 
+            :precision="field.precision" 
+            style="width: 100%;" 
           />
-        </el-form-item>
-        <el-form-item label="实际开始" prop="actual_start_time">
-          <el-date-picker
-            v-model="form.actual_start_time"
-            type="date"
-            placeholder="请选择实际开始日期"
-            style="width: 100%;"
-            value-format="YYYY-MM-DD"
+          <el-input 
+            v-else-if="field.type === 'textarea'"
+            v-model="form[field.prop]" 
+            type="textarea" 
+            :rows="field.rows || 3"
+            :placeholder="field.placeholder" 
           />
-        </el-form-item>
-        <el-form-item label="实际结束" prop="actual_end_time">
-          <el-date-picker
-            v-model="form.actual_end_time"
-            type="date"
-            placeholder="请选择实际结束日期"
-            style="width: 100%;"
-            value-format="YYYY-MM-DD"
-          />
-        </el-form-item>
-        <el-form-item label="进度(%)" prop="progress_percentage">
-          <el-input-number v-model="form.progress_percentage" :min="0" :max="100" :precision="2" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item label="负责人" prop="responsible_person">
-          <el-input v-model="form.responsible_person" placeholder="请输入负责人" />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-input v-model="form.status" placeholder="请输入状态" />
-        </el-form-item>
-        <el-form-item label="滞后原因" prop="lag_reason">
-          <el-input v-model="form.lag_reason" type="textarea" :rows="3" placeholder="请输入滞后原因" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -165,6 +140,179 @@ import { Plus, Refresh } from '@element-plus/icons-vue'
 import { projectProgressApi } from '@/api/projectProgress'
 import { projectApi } from '@/api/project'
 
+// ==================== 配置常量区域 ====================
+
+const TASK_STATUS_CONFIG = {
+  '已完成': 'success',
+  '进行中': 'primary',
+  '滞后': 'warning',
+  '暂停': 'info'
+}
+
+const tableColumns = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    width: '150',
+    formatter: (row, projectList) => getProjectName(row.project_id, projectList)
+  },
+  { prop: 'task_name', label: '任务名称', width: '200' },
+  { 
+    prop: 'plan_start_time', 
+    label: '计划开始', 
+    width: '120',
+    formatter: (row) => row.plan_start_time || '-'
+  },
+  { 
+    prop: 'plan_end_time', 
+    label: '计划结束', 
+    width: '120',
+    formatter: (row) => row.plan_end_time || '-'
+  },
+  { 
+    prop: 'actual_start_time', 
+    label: '实际开始', 
+    width: '120',
+    formatter: (row) => row.actual_start_time || '-'
+  },
+  { 
+    prop: 'actual_end_time', 
+    label: '实际结束', 
+    width: '120',
+    formatter: (row) => row.actual_end_time || '-'
+  },
+  { 
+    prop: 'progress_percentage', 
+    label: '进度(%)', 
+    width: '100',
+    type: 'progress'
+  },
+  { prop: 'responsible_person', label: '负责人', width: '120' },
+  { 
+    prop: 'status', 
+    label: '状态', 
+    width: '100',
+    tagType: (val) => TASK_STATUS_CONFIG[val] || 'info'
+  },
+  { prop: 'lag_reason', label: '滞后原因', showOverflowTooltip: true }
+]
+
+const formFields = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    type: 'select', 
+    placeholder: '请选择项目',
+    optionsKey: 'projectList',
+    optionLabel: 'project_name',
+    optionValue: 'project_id',
+    required: true
+  },
+  { 
+    prop: 'task_name', 
+    label: '任务名称', 
+    type: 'input', 
+    placeholder: '请输入任务名称',
+    required: true
+  },
+  { 
+    prop: 'plan_start_time', 
+    label: '计划开始', 
+    type: 'date', 
+    placeholder: '请选择计划开始日期',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD',
+    required: true
+  },
+  { 
+    prop: 'plan_end_time', 
+    label: '计划结束', 
+    type: 'date', 
+    placeholder: '请选择计划结束日期',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD',
+    required: true
+  },
+  { 
+    prop: 'actual_start_time', 
+    label: '实际开始', 
+    type: 'date', 
+    placeholder: '请选择实际开始日期',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD'
+  },
+  { 
+    prop: 'actual_end_time', 
+    label: '实际结束', 
+    type: 'date', 
+    placeholder: '请选择实际结束日期',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD'
+  },
+  { 
+    prop: 'progress_percentage', 
+    label: '进度(%)', 
+    type: 'number', 
+    min: 0,
+    max: 100,
+    precision: 2,
+    placeholder: '请输入进度'
+  },
+  { 
+    prop: 'responsible_person', 
+    label: '负责人', 
+    type: 'input', 
+    placeholder: '请输入负责人'
+  },
+  { 
+    prop: 'status', 
+    label: '状态', 
+    type: 'input', 
+    placeholder: '请输入状态'
+  },
+  { 
+    prop: 'lag_reason', 
+    label: '滞后原因', 
+    type: 'textarea', 
+    placeholder: '请输入滞后原因',
+    rows: 3
+  }
+]
+
+const generateRules = () => {
+  const rules = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      rules[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+    }
+  })
+  return rules
+}
+
+const getInitialFormData = () => {
+  const formData = { progress_id: '' }
+  formFields.forEach(field => {
+    if (field.type === 'number') {
+      formData[field.prop] = field.min || 0
+    } else if (field.type === 'select') {
+      formData[field.prop] = ''
+    } else {
+      formData[field.prop] = ''
+    }
+  })
+  formData.status = '进行中'
+  return formData
+}
+
+// ==================== 辅助函数 ====================
+
+const getProjectName = (projectId, projectList) => {
+  const project = projectList?.find(p => p.project_id === projectId)
+  return project ? project.project_name : '-'
+}
+
+// ==================== 响应式数据 ====================
+
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
@@ -175,26 +323,10 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
-const form = ref({
-  progress_id: '',
-  project_id: '',
-  task_name: '',
-  plan_start_time: '',
-  plan_end_time: '',
-  actual_start_time: '',
-  actual_end_time: '',
-  progress_percentage: 0,
-  responsible_person: '',
-  lag_reason: '',
-  status: '进行中'
-})
+const form = ref(getInitialFormData())
+const rules = generateRules()
 
-const rules = {
-  project_id: [{ required: true, message: '请选择项目', trigger: 'change' }],
-  task_name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  plan_start_time: [{ required: true, message: '请选择计划开始日期', trigger: 'change' }],
-  plan_end_time: [{ required: true, message: '请选择计划结束日期', trigger: 'change' }]
-}
+// ==================== API 调用 ====================
 
 const loadProjects = async () => {
   try {
@@ -205,16 +337,6 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
-}
-
-const getProjectName = (projectId) => {
-  const project = projectList.value.find(p => p.project_id === projectId)
-  return project ? project.project_name : '-'
-}
-
-const getTaskStatusType = (status) => {
-  const statusMap = { '已完成': 'success', '进行中': 'primary', '滞后': 'warning', '暂停': 'info' }
-  return statusMap[status] || 'info'
 }
 
 const loadData = async () => {
@@ -243,19 +365,8 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = {
-    progress_id: '',
-    project_id: selectedProjectId.value || '',
-    task_name: '',
-    plan_start_time: '',
-    plan_end_time: '',
-    actual_start_time: '',
-    actual_end_time: '',
-    progress_percentage: 0,
-    responsible_person: '',
-    lag_reason: '',
-    status: '进行中'
-  }
+  const initialForm = getInitialFormData()
+  form.value = { ...initialForm, project_id: selectedProjectId.value || '' }
   dialogVisible.value = true
 }
 

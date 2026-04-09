@@ -16,20 +16,23 @@
     </div>
     
     <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column prop="data_source" label="数据来源" width="150" />
-      <el-table-column prop="data_type" label="数据类型" width="150" />
-      <el-table-column label="采集时间" width="140">
+      <el-table-column 
+        v-for="column in tableColumns" 
+        :key="column.prop"
+        :prop="column.prop"
+        :label="column.label"
+        :width="column.width"
+        :fixed="column.fixed"
+      >
         <template #default="scope">
-          {{ formatDateTime(scope.row.collection_time) }}
+          <span v-if="column.formatter">
+            {{ column.formatter(scope.row) }}
+          </span>
+          <span v-else>
+            {{ scope.row[column.prop] || '-' }}
+          </span>
         </template>
       </el-table-column>
-      <el-table-column prop="data_description" label="数据描述" show-overflow-tooltip />
-      <el-table-column prop="analysis_method" label="分析方法" width="120" />
-      <el-table-column prop="analyst" label="分析师" width="120" />
-      <el-table-column prop="analysis_period" label="分析周期" width="120" />
-      <el-table-column prop="key_indicator" label="关键指标" width="150" />
-      <el-table-column prop="indicator_value" label="指标值" width="120" />
-      <el-table-column prop="analysis_result" label="分析结果" show-overflow-tooltip />
       <el-table-column label="操作" fixed="right" width="200">
         <template #default="scope">
           <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
@@ -55,44 +58,47 @@
       width="600px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="文件ID" prop="file_id">
-          <el-input v-model="form.file_id" placeholder="请输入文件ID" />
-        </el-form-item>
-        <el-form-item label="数据来源" prop="data_source">
-          <el-input v-model="form.data_source" placeholder="请输入数据来源" />
-        </el-form-item>
-        <el-form-item label="数据类型" prop="data_type">
-          <el-input v-model="form.data_type" placeholder="请输入数据类型" />
-        </el-form-item>
-        <el-form-item label="采集时间" prop="collection_time">
-          <el-date-picker
-            v-model="form.collection_time"
-            type="date"
-            placeholder="请选择采集时间"
-            style="width: 100%;"
-            value-format="YYYY-MM-DD"
+        <el-form-item 
+          v-for="field in formFields" 
+          :key="field.prop"
+          :label="field.label" 
+          :prop="field.prop"
+        >
+          <el-input 
+            v-if="field.type === 'input'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
           />
-        </el-form-item>
-        <el-form-item label="数据描述" prop="data_description">
-          <el-input v-model="form.data_description" type="textarea" :rows="3" placeholder="请输入数据描述" />
-        </el-form-item>
-        <el-form-item label="分析方法" prop="analysis_method">
-          <el-input v-model="form.analysis_method" placeholder="请输入分析方法" />
-        </el-form-item>
-        <el-form-item label="分析师" prop="analyst">
-          <el-input v-model="form.analyst" placeholder="请输入分析师" />
-        </el-form-item>
-        <el-form-item label="分析周期" prop="analysis_period">
-          <el-input v-model="form.analysis_period" placeholder="请输入分析周期" />
-        </el-form-item>
-        <el-form-item label="关键指标" prop="key_indicator">
-          <el-input v-model="form.key_indicator" placeholder="请输入关键指标" />
-        </el-form-item>
-        <el-form-item label="指标值" prop="indicator_value">
-          <el-input-number v-model="form.indicator_value" :precision="4" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item label="分析结果" prop="analysis_result">
-          <el-input v-model="form.analysis_result" type="textarea" :rows="3" placeholder="请输入分析结果" />
+          <el-date-picker
+            v-else-if="field.type === 'date'"
+            v-model="form[field.prop]"
+            :type="field.dateType || 'date'"
+            :placeholder="field.placeholder"
+            style="width: 100%;"
+            :value-format="field.valueFormat || 'YYYY-MM-DD'"
+          />
+          <el-input-number
+            v-else-if="field.type === 'number'"
+            v-model="form[field.prop]" 
+            :min="field.min" 
+            :max="field.max"
+            :precision="field.precision" 
+            style="width: 100%;" 
+          />
+          <el-input 
+            v-else-if="field.type === 'textarea'"
+            v-model="form[field.prop]" 
+            type="textarea" 
+            :rows="field.rows || 3"
+            :placeholder="field.placeholder" 
+          />
+          <SingleFileUploader
+            v-else-if="field.type === 'file'"
+            v-model="form[field.prop]"
+            :file-data="currentFileInfo"
+            :file-type="3"
+            @change="handleFileChange"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -104,10 +110,140 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { dataAnalysisApi } from '@/api/dataAnalysis'
+import { fileApi } from '@/api/file'
+import SingleFileUploader from '@/components/SingleFileUploader.vue'
+
+// ==================== 配置常量区域 ====================
+
+const tableColumns = [
+  { prop: 'data_source', label: '数据来源', width: '150' },
+  { prop: 'data_type', label: '数据类型', width: '150' },
+  { 
+    prop: 'collection_time', 
+    label: '采集时间', 
+    width: '140',
+    formatter: (row) => formatDateTime(row.collection_time)
+  },
+  { prop: 'data_description', label: '数据描述', showOverflowTooltip: true },
+  { prop: 'analysis_method', label: '分析方法', width: '120' },
+  { prop: 'analyst', label: '分析师', width: '120' },
+  { prop: 'analysis_period', label: '分析周期', width: '120' },
+  { prop: 'key_indicator', label: '关键指标', width: '150' },
+  { prop: 'indicator_value', label: '指标值', width: '120' },
+  { prop: 'analysis_result', label: '分析结果', showOverflowTooltip: true }
+]
+
+const formFields = [
+  { 
+    prop: 'file_id', 
+    label: '文件上传', 
+    type: 'file', 
+    required: true
+  },
+  { 
+    prop: 'data_source', 
+    label: '数据来源', 
+    type: 'input', 
+    placeholder: '请输入数据来源',
+    required: true
+  },
+  { 
+    prop: 'data_type', 
+    label: '数据类型', 
+    type: 'input', 
+    placeholder: '请输入数据类型',
+    required: true
+  },
+  { 
+    prop: 'collection_time', 
+    label: '采集时间', 
+    type: 'date', 
+    placeholder: '请选择采集时间',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD',
+    required: true
+  },
+  { 
+    prop: 'data_description', 
+    label: '数据描述', 
+    type: 'textarea', 
+    placeholder: '请输入数据描述',
+    rows: 3
+  },
+  { 
+    prop: 'analysis_method', 
+    label: '分析方法', 
+    type: 'input', 
+    placeholder: '请输入分析方法'
+  },
+  { 
+    prop: 'analyst', 
+    label: '分析师', 
+    type: 'input', 
+    placeholder: '请输入分析师'
+  },
+  { 
+    prop: 'analysis_period', 
+    label: '分析周期', 
+    type: 'input', 
+    placeholder: '请输入分析周期'
+  },
+  { 
+    prop: 'key_indicator', 
+    label: '关键指标', 
+    type: 'input', 
+    placeholder: '请输入关键指标'
+  },
+  { 
+    prop: 'indicator_value', 
+    label: '指标值', 
+    type: 'number', 
+    precision: 4,
+    placeholder: '请输入指标值'
+  },
+  { 
+    prop: 'analysis_result', 
+    label: '分析结果', 
+    type: 'textarea', 
+    placeholder: '请输入分析结果',
+    rows: 3
+  }
+]
+
+const generateRules = () => {
+  const rules = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      rules[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+    }
+  })
+  return rules
+}
+
+const getInitialFormData = () => {
+  const formData = { analysis_id: '' }
+  formFields.forEach(field => {
+    if (field.type === 'number') {
+      formData[field.prop] = 0
+    } else {
+      formData[field.prop] = ''
+    }
+  })
+  return formData
+}
+
+// ==================== 辅助函数 ====================
+
+const formatDateTime = (datetime) => {
+  if (!datetime) return '-'
+  return datetime.split(' ')[0]
+}
+
+// ==================== 响应式数据 ====================
 
 const loading = ref(false)
 const tableData = ref([])
@@ -118,32 +254,36 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
-const form = ref({
-  analysis_id: '',
-  file_id: '',
-  data_source: '',
-  data_type: '',
-  collection_time: '',
-  data_description: '',
-  analysis_method: '',
-  analyst: '',
-  analysis_period: '',
-  key_indicator: '',
-  indicator_value: 0,
-  analysis_result: ''
+const form = ref(getInitialFormData())
+const currentFileInfo = ref(null)
+
+const rules = computed(() => {
+  const rulesObj = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      if (field.prop === 'file_id') {
+        rulesObj[field.prop] = [
+          {
+            required: true,
+            validator: (rule, value, callback) => {
+              if (!isEdit.value && !value) {
+                callback(new Error('请上传文件'))
+              } else {
+                callback()
+              }
+            },
+            trigger: 'change'
+          }
+        ]
+      } else {
+        rulesObj[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+      }
+    }
+  })
+  return rulesObj
 })
 
-const rules = {
-  file_id: [{ required: true, message: '请输入文件ID', trigger: 'blur' }],
-  data_source: [{ required: true, message: '请输入数据来源', trigger: 'blur' }],
-  data_type: [{ required: true, message: '请输入数据类型', trigger: 'blur' }],
-  collection_time: [{ required: true, message: '请选择采集时间', trigger: 'change' }]
-}
-
-const formatDateTime = (datetime) => {
-  if (!datetime) return '-'
-  return datetime.split(' ')[0]
-}
+// ==================== API 调用 ====================
 
 const loadData = async () => {
   loading.value = true
@@ -168,27 +308,38 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = {
-    analysis_id: '',
-    file_id: '',
-    data_source: '',
-    data_type: '',
-    collection_time: '',
-    data_description: '',
-    analysis_method: '',
-    analyst: '',
-    analysis_period: '',
-    key_indicator: '',
-    indicator_value: 0,
-    analysis_result: ''
+  currentFileInfo.value = null
+  form.value = getInitialFormData()
+  dialogVisible.value = true
+}
+
+const handleEdit = async (row) => {
+  isEdit.value = true
+  form.value = { ...row }
+  if (row.file_id) {
+    await loadFileInfo(row.file_id)
+  } else {
+    currentFileInfo.value = null
   }
   dialogVisible.value = true
 }
 
-const handleEdit = (row) => {
-  isEdit.value = true
-  form.value = { ...row }
-  dialogVisible.value = true
+const handleFileChange = (file) => {
+  currentFileInfo.value = file
+}
+
+const loadFileInfo = async (fileId) => {
+  try {
+    const res = await fileApi.fileUrlsGen({ files_id: [fileId] })
+    if (res.success && res.data && res.data.length > 0) {
+      currentFileInfo.value = res.data[0]
+    } else {
+      currentFileInfo.value = null
+    }
+  } catch (error) {
+    console.error('加载文件信息失败:', error)
+    currentFileInfo.value = null
+  }
 }
 
 const handleSubmit = async () => {

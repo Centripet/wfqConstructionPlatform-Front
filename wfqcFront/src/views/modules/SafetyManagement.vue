@@ -23,37 +23,27 @@
     </div>
     
     <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column label="所属项目" width="150">
+      <el-table-column 
+        v-for="column in tableColumns" 
+        :key="column.prop"
+        :prop="column.prop"
+        :label="column.label"
+        :width="column.width"
+        :fixed="column.fixed"
+      >
         <template #default="scope">
-          {{ getProjectName(scope.row.project_id) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="event_name" label="事件名称" width="180" />
-      <el-table-column label="发生时间" width="180">
-        <template #default="scope">
-          {{ formatDateTime(scope.row.occurrence_time) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="occurrence_place" label="发生地点" width="150" />
-      <el-table-column prop="responsible_person" label="责任人" width="120" />
-      <el-table-column label="事件等级" width="100">
-        <template #default="scope">
-          <el-tag :type="getEventLevelType(scope.row.event_level)">
-            {{ getEventLevelText(scope.row.event_level) }}
+          <el-tag 
+            v-if="column.tagType" 
+            :type="column.tagType(scope.row[column.prop])"
+          >
+            {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
           </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="处理状态" width="100">
-        <template #default="scope">
-          <el-tag :type="getProcessingStatusType(scope.row.processing_status)">
-            {{ getProcessingStatusText(scope.row.processing_status) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="rectification_measures" label="整改措施" show-overflow-tooltip />
-      <el-table-column label="整改完成时间" width="180">
-        <template #default="scope">
-          {{ formatDateTime(scope.row.rectification_completion_time) }}
+          <span v-else-if="column.formatter">
+            {{ column.formatter(scope.row) }}
+          </span>
+          <span v-else>
+            {{ scope.row[column.prop] || '-' }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="操作" fixed="right" width="200">
@@ -81,61 +71,45 @@
       width="600px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="130px">
-        <el-form-item label="所属项目" prop="project_id">
-          <el-select v-model="form.project_id" placeholder="请选择项目" style="width: 100%;">
-            <el-option
-              v-for="proj in projectList"
-              :key="proj.project_id"
-              :label="proj.project_name"
-              :value="proj.project_id"
+        <el-form-item 
+          v-for="field in formFields" 
+          :key="field.prop"
+          :label="field.label" 
+          :prop="field.prop"
+        >
+          <el-input 
+            v-if="field.type === 'input'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+          />
+          <el-select 
+            v-else-if="field.type === 'select'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+            style="width: 100%;"
+          >
+            <el-option 
+              v-for="item in (field.optionsKey === 'projectList' ? projectList : field.options)" 
+              :key="item[field.optionValue || 'value']"
+              :label="item[field.optionLabel || 'label']" 
+              :value="item[field.optionValue || 'value']" 
             />
           </el-select>
-        </el-form-item>
-        <el-form-item label="事件名称" prop="event_name">
-          <el-input v-model="form.event_name" placeholder="请输入事件名称" />
-        </el-form-item>
-        <el-form-item label="发生时间" prop="occurrence_time">
           <el-date-picker
-            v-model="form.occurrence_time"
-            type="datetime"
-            placeholder="请选择发生时间"
+            v-else-if="field.type === 'date'"
+            v-model="form[field.prop]"
+            :type="field.dateType || 'date'"
+            :placeholder="field.placeholder"
             style="width: 100%;"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            format="YYYY-MM-DD HH:mm:ss"
+            :value-format="field.valueFormat || 'YYYY-MM-DD'"
+            :format="field.format"
           />
-        </el-form-item>
-        <el-form-item label="发生地点" prop="occurrence_place">
-          <el-input v-model="form.occurrence_place" placeholder="请输入发生地点" />
-        </el-form-item>
-        <el-form-item label="责任人" prop="responsible_person">
-          <el-input v-model="form.responsible_person" placeholder="请输入责任人" />
-        </el-form-item>
-        <el-form-item label="事件等级" prop="event_level">
-          <el-select v-model="form.event_level" placeholder="请选择事件等级" style="width: 100%;">
-            <el-option label="一般" :value="0" />
-            <el-option label="较大" :value="1" />
-            <el-option label="重大" :value="2" />
-            <el-option label="特别重大" :value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="处理状态" prop="processing_status">
-          <el-select v-model="form.processing_status" placeholder="请选择处理状态" style="width: 100%;">
-            <el-option label="待处理" :value="0" />
-            <el-option label="处理中" :value="1" />
-            <el-option label="已完成" :value="2" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="整改措施" prop="rectification_measures">
-          <el-input v-model="form.rectification_measures" type="textarea" :rows="3" placeholder="请输入整改措施" />
-        </el-form-item>
-        <el-form-item label="整改完成时间" prop="rectification_completion_time">
-          <el-date-picker
-            v-model="form.rectification_completion_time"
-            type="datetime"
-            placeholder="请选择整改完成时间"
-            style="width: 100%;"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            format="YYYY-MM-DD HH:mm:ss"
+          <el-input 
+            v-else-if="field.type === 'textarea'"
+            v-model="form[field.prop]" 
+            type="textarea" 
+            :rows="field.rows || 3"
+            :placeholder="field.placeholder" 
           />
         </el-form-item>
       </el-form>
@@ -154,6 +128,186 @@ import { Plus, Refresh } from '@element-plus/icons-vue'
 import { safetyEventApi } from '@/api/safetyEvent'
 import { projectApi } from '@/api/project'
 
+// ==================== 配置常量区域 ====================
+
+const EVENT_LEVEL_CONFIG = {
+  0: { label: '一般', type: 'info' },
+  1: { label: '严重', type: 'warning' },
+  2: { label: '重大', type: 'danger' }
+  // ,3: { label: '特别重大', type: 'danger' }
+}
+
+const PROCESSING_STATUS_CONFIG = {
+  0: { label: '处理中', type: 'warning' },
+  1: { label: '已完成', type: 'success' },
+  // 0: { label: '待处理', type: 'info' },
+  // 1: { label: '处理中', type: 'warning' },
+  // 2: { label: '已完成', type: 'success' }
+}
+
+const eventLevelOptions = Object.entries(EVENT_LEVEL_CONFIG).map(([value, config]) => ({
+  value: Number(value),
+  label: config.label
+}))
+
+const processingStatusOptions = Object.entries(PROCESSING_STATUS_CONFIG).map(([value, config]) => ({
+  value: Number(value),
+  label: config.label
+}))
+
+const tableColumns = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    width: '150',
+    formatter: (row, projectList) => getProjectName(row.project_id, projectList)
+  },
+  { prop: 'event_name', label: '事件名称', width: '180' },
+  { 
+    prop: 'occurrence_time', 
+    label: '发生时间', 
+    width: '180',
+    formatter: (row) => formatDateTime(row.occurrence_time)
+  },
+  { prop: 'occurrence_place', label: '发生地点', width: '150' },
+  { prop: 'responsible_person', label: '责任人', width: '120' },
+  { 
+    prop: 'event_level', 
+    label: '事件等级', 
+    width: '100',
+    tagType: (val) => EVENT_LEVEL_CONFIG[val]?.type || 'info',
+    formatter: (row) => EVENT_LEVEL_CONFIG[row.event_level]?.label || '未知'
+  },
+  { 
+    prop: 'processing_status', 
+    label: '处理状态', 
+    width: '100',
+    tagType: (val) => PROCESSING_STATUS_CONFIG[val]?.type || 'info',
+    formatter: (row) => PROCESSING_STATUS_CONFIG[row.processing_status]?.label || '未知'
+  },
+  { prop: 'rectification_measures', label: '整改措施', showOverflowTooltip: true },
+  { 
+    prop: 'rectification_completion_time', 
+    label: '整改完成时间', 
+    width: '180',
+    formatter: (row) => formatDateTime(row.rectification_completion_time)
+  }
+]
+
+const formFields = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    type: 'select', 
+    placeholder: '请选择项目',
+    optionsKey: 'projectList',
+    optionLabel: 'project_name',
+    optionValue: 'project_id',
+    required: true
+  },
+  { 
+    prop: 'event_name', 
+    label: '事件名称', 
+    type: 'input', 
+    placeholder: '请输入事件名称',
+    required: true
+  },
+  { 
+    prop: 'occurrence_time', 
+    label: '发生时间', 
+    type: 'date', 
+    placeholder: '请选择发生时间',
+    dateType: 'datetime',
+    valueFormat: 'YYYY-MM-DDTHH:mm:ss',
+    format: 'YYYY-MM-DD HH:mm:ss',
+    required: true
+  },
+  { 
+    prop: 'occurrence_place', 
+    label: '发生地点', 
+    type: 'input', 
+    placeholder: '请输入发生地点',
+    required: true
+  },
+  { 
+    prop: 'responsible_person', 
+    label: '责任人', 
+    type: 'input', 
+    placeholder: '请输入责任人',
+    required: true
+  },
+  { 
+    prop: 'event_level', 
+    label: '事件等级', 
+    type: 'select', 
+    placeholder: '请选择事件等级',
+    options: eventLevelOptions,
+    required: true
+  },
+  { 
+    prop: 'processing_status', 
+    label: '处理状态', 
+    type: 'select', 
+    placeholder: '请选择处理状态',
+    options: processingStatusOptions,
+    required: true
+  },
+  { 
+    prop: 'rectification_measures', 
+    label: '整改措施', 
+    type: 'textarea', 
+    placeholder: '请输入整改措施',
+    rows: 3
+  },
+  { 
+    prop: 'rectification_completion_time', 
+    label: '整改完成时间', 
+    type: 'date', 
+    placeholder: '请选择整改完成时间',
+    dateType: 'datetime',
+    valueFormat: 'YYYY-MM-DDTHH:mm:ss',
+    format: 'YYYY-MM-DD HH:mm:ss'
+  }
+]
+
+const generateRules = () => {
+  const rules = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      rules[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+    }
+  })
+  return rules
+}
+
+const getInitialFormData = () => {
+  const formData = { event_id: '' }
+  formFields.forEach(field => {
+    if (field.type === 'number') {
+      formData[field.prop] = field.min || 0
+    } else if (field.type === 'select') {
+      formData[field.prop] = field.options ? field.options[0]?.value : ''
+    } else {
+      formData[field.prop] = ''
+    }
+  })
+  return formData
+}
+
+// ==================== 辅助函数 ====================
+
+const getProjectName = (projectId, projectList) => {
+  const project = projectList?.find(p => p.project_id === projectId)
+  return project ? project.project_name : '-'
+}
+
+const formatDateTime = (datetime) => {
+  if (!datetime) return '-'
+  return datetime
+}
+
+// ==================== 响应式数据 ====================
+
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
@@ -164,28 +318,10 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
-const form = ref({
-  event_id: '',
-  project_id: '',
-  event_name: '',
-  occurrence_time: '',
-  occurrence_place: '',
-  responsible_person: '',
-  event_level: 0,
-  processing_status: 0,
-  rectification_measures: '',
-  rectification_completion_time: ''
-})
+const form = ref(getInitialFormData())
+const rules = generateRules()
 
-const rules = {
-  project_id: [{ required: true, message: '请选择项目', trigger: 'change' }],
-  event_name: [{ required: true, message: '请输入事件名称', trigger: 'blur' }],
-  occurrence_time: [{ required: true, message: '请选择发生时间', trigger: 'change' }],
-  occurrence_place: [{ required: true, message: '请输入发生地点', trigger: 'blur' }],
-  responsible_person: [{ required: true, message: '请输入责任人', trigger: 'blur' }],
-  event_level: [{ required: true, message: '请选择事件等级', trigger: 'change' }],
-  processing_status: [{ required: true, message: '请选择处理状态', trigger: 'change' }]
-}
+// ==================== API 调用 ====================
 
 const loadProjects = async () => {
   try {
@@ -196,36 +332,6 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
-}
-
-const getProjectName = (projectId) => {
-  const project = projectList.value.find(p => p.project_id === projectId)
-  return project ? project.project_name : '-'
-}
-
-const formatDateTime = (datetime) => {
-  if (!datetime) return '-'
-  return datetime
-}
-
-const getEventLevelType = (level) => {
-  const levelMap = { 0: 'info', 1: 'warning', 2: 'danger', 3: 'danger' }
-  return levelMap[level] || 'info'
-}
-
-const getEventLevelText = (level) => {
-  const levelMap = { 0: '一般', 1: '较大', 2: '重大', 3: '特别重大' }
-  return levelMap[level] || '未知'
-}
-
-const getProcessingStatusType = (status) => {
-  const statusMap = { 0: 'info', 1: 'warning', 2: 'success' }
-  return statusMap[status] || 'info'
-}
-
-const getProcessingStatusText = (status) => {
-  const statusMap = { 0: '待处理', 1: '处理中', 2: '已完成' }
-  return statusMap[status] || '未知'
 }
 
 const loadData = async () => {
@@ -254,18 +360,8 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = {
-    event_id: '',
-    project_id: selectedProjectId.value || '',
-    event_name: '',
-    occurrence_time: '',
-    occurrence_place: '',
-    responsible_person: '',
-    event_level: 0,
-    processing_status: 0,
-    rectification_measures: '',
-    rectification_completion_time: ''
-  }
+  const initialForm = getInitialFormData()
+  form.value = { ...initialForm, project_id: selectedProjectId.value || '' }
   dialogVisible.value = true
 }
 

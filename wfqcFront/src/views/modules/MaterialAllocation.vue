@@ -31,27 +31,23 @@
     </div>
     
     <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column prop="material_name" label="物资名称" width="150" />
-      <el-table-column prop="material_specification" label="规格型号" width="120" />
-      <el-table-column label="调出项目" width="180">
+      <el-table-column 
+        v-for="column in tableColumns" 
+        :key="column.prop"
+        :prop="column.prop"
+        :label="column.label"
+        :width="column.width"
+        :fixed="column.fixed"
+      >
         <template #default="scope">
-          {{ getProjectName(scope.row.transfer_out_project_id) }}
+          <span v-if="column.formatter">
+            {{ column.formatter(scope.row) }}
+          </span>
+          <span v-else>
+            {{ scope.row[column.prop] || '-' }}
+          </span>
         </template>
       </el-table-column>
-      <el-table-column label="调入项目" width="180">
-        <template #default="scope">
-          {{ getProjectName(scope.row.transfer_in_project_id) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="allocation_number" label="调配数量" width="100" />
-      <el-table-column prop="allocation_unit" label="单位" width="80" />
-      <el-table-column label="调配时间" width="120">
-        <template #default="scope">
-          {{ scope.row.allocation_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="allocation_responsible" label="负责人" width="120" />
-      <el-table-column prop="remarks" label="备注" show-overflow-tooltip />
       <el-table-column label="操作" fixed="right" width="200">
         <template #default="scope">
           <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
@@ -77,52 +73,52 @@
       width="600px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="130px">
-        <el-form-item label="物资名称" prop="material_name">
-          <el-input v-model="form.material_name" placeholder="请输入物资名称" />
-        </el-form-item>
-        <el-form-item label="规格型号" prop="material_specification">
-          <el-input v-model="form.material_specification" placeholder="请输入规格型号" />
-        </el-form-item>
-        <el-form-item label="调出项目" prop="transfer_out_project_id">
-          <el-select v-model="form.transfer_out_project_id" placeholder="请选择调出项目" style="width: 100%;">
-            <el-option
-              v-for="proj in projectList"
-              :key="proj.project_id"
-              :label="proj.project_name"
-              :value="proj.project_id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="调入项目" prop="transfer_in_project_id">
-          <el-select v-model="form.transfer_in_project_id" placeholder="请选择调入项目" style="width: 100%;">
-            <el-option
-              v-for="proj in projectList"
-              :key="proj.project_id"
-              :label="proj.project_name"
-              :value="proj.project_id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="调配数量" prop="allocation_number">
-          <el-input-number v-model="form.allocation_number" :min="1" style="width: 100%;" />
-        </el-form-item>
-        <el-form-item label="单位" prop="allocation_unit">
-          <el-input v-model="form.allocation_unit" placeholder="请输入单位" />
-        </el-form-item>
-        <el-form-item label="调配时间" prop="allocation_time">
-          <el-date-picker
-            v-model="form.allocation_time"
-            type="date"
-            placeholder="请选择调配时间"
-            style="width: 100%;"
-            value-format="YYYY-MM-DD"
+        <el-form-item 
+          v-for="field in formFields" 
+          :key="field.prop"
+          :label="field.label" 
+          :prop="field.prop"
+        >
+          <el-input 
+            v-if="field.type === 'input'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
           />
-        </el-form-item>
-        <el-form-item label="负责人" prop="allocation_responsible">
-          <el-input v-model="form.allocation_responsible" placeholder="请输入负责人" />
-        </el-form-item>
-        <el-form-item label="备注" prop="remarks">
-          <el-input v-model="form.remarks" type="textarea" :rows="3" placeholder="请输入备注" />
+          <el-select 
+            v-else-if="field.type === 'select'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+            style="width: 100%;"
+          >
+            <el-option 
+              v-for="item in (field.optionsKey === 'projectList' ? projectList : field.options)" 
+              :key="item[field.optionValue || 'value']"
+              :label="item[field.optionLabel || 'label']" 
+              :value="item[field.optionValue || 'value']" 
+            />
+          </el-select>
+          <el-date-picker
+            v-else-if="field.type === 'date'"
+            v-model="form[field.prop]"
+            :type="field.dateType || 'date'"
+            :placeholder="field.placeholder"
+            style="width: 100%;"
+            :value-format="field.valueFormat || 'YYYY-MM-DD'"
+          />
+          <el-input-number
+            v-else-if="field.type === 'number'"
+            v-model="form[field.prop]" 
+            :min="field.min || 0" 
+            :precision="field.precision" 
+            style="width: 100%;" 
+          />
+          <el-input 
+            v-else-if="field.type === 'textarea'"
+            v-model="form[field.prop]" 
+            type="textarea" 
+            :rows="field.rows || 3"
+            :placeholder="field.placeholder" 
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -140,6 +136,140 @@ import { Plus, Refresh } from '@element-plus/icons-vue'
 import { materialAllocationApi } from '@/api/materialAllocation'
 import { projectApi } from '@/api/project'
 
+// ==================== 配置常量区域 ====================
+
+const tableColumns = [
+  { prop: 'material_name', label: '物资名称', width: '150' },
+  { prop: 'material_specification', label: '规格型号', width: '120' },
+  { 
+    prop: 'transfer_out_project_id', 
+    label: '调出项目', 
+    width: '180',
+    formatter: (row, projectList) => getProjectName(row.transfer_out_project_id, projectList)
+  },
+  { 
+    prop: 'transfer_in_project_id', 
+    label: '调入项目', 
+    width: '180',
+    formatter: (row, projectList) => getProjectName(row.transfer_in_project_id, projectList)
+  },
+  { prop: 'allocation_number', label: '调配数量', width: '100' },
+  { prop: 'allocation_unit', label: '单位', width: '80' },
+  { 
+    prop: 'allocation_time', 
+    label: '调配时间', 
+    width: '120',
+    formatter: (row) => row.allocation_time || '-'
+  },
+  { prop: 'allocation_responsible', label: '负责人', width: '120' },
+  { prop: 'remarks', label: '备注', showOverflowTooltip: true }
+]
+
+const formFields = [
+  { 
+    prop: 'material_name', 
+    label: '物资名称', 
+    type: 'input', 
+    placeholder: '请输入物资名称',
+    required: true
+  },
+  { 
+    prop: 'material_specification', 
+    label: '规格型号', 
+    type: 'input', 
+    placeholder: '请输入规格型号'
+  },
+  { 
+    prop: 'transfer_out_project_id', 
+    label: '调出项目', 
+    type: 'select', 
+    placeholder: '请选择调出项目',
+    optionsKey: 'projectList',
+    optionLabel: 'project_name',
+    optionValue: 'project_id',
+    required: true
+  },
+  { 
+    prop: 'transfer_in_project_id', 
+    label: '调入项目', 
+    type: 'select', 
+    placeholder: '请选择调入项目',
+    optionsKey: 'projectList',
+    optionLabel: 'project_name',
+    optionValue: 'project_id',
+    required: true
+  },
+  { 
+    prop: 'allocation_number', 
+    label: '调配数量', 
+    type: 'number', 
+    min: 1,
+    placeholder: '请输入调配数量'
+  },
+  { 
+    prop: 'allocation_unit', 
+    label: '单位', 
+    type: 'input', 
+    placeholder: '请输入单位'
+  },
+  { 
+    prop: 'allocation_time', 
+    label: '调配时间', 
+    type: 'date', 
+    placeholder: '请选择调配时间',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD',
+    required: true
+  },
+  { 
+    prop: 'allocation_responsible', 
+    label: '负责人', 
+    type: 'input', 
+    placeholder: '请输入负责人',
+    required: true
+  },
+  { 
+    prop: 'remarks', 
+    label: '备注', 
+    type: 'textarea', 
+    placeholder: '请输入备注',
+    rows: 3
+  }
+]
+
+const generateRules = () => {
+  const rules = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      rules[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+    }
+  })
+  return rules
+}
+
+const getInitialFormData = () => {
+  const formData = { material_id: '' }
+  formFields.forEach(field => {
+    if (field.type === 'number') {
+      formData[field.prop] = field.min || 0
+    } else if (field.type === 'select') {
+      formData[field.prop] = ''
+    } else {
+      formData[field.prop] = ''
+    }
+  })
+  return formData
+}
+
+// ==================== 辅助函数 ====================
+
+const getProjectName = (projectId, projectList) => {
+  const project = projectList?.find(p => p.project_id === projectId)
+  return project ? project.project_name : '-'
+}
+
+// ==================== 响应式数据 ====================
+
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
@@ -151,26 +281,10 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
-const form = ref({
-  material_id: '',
-  material_name: '',
-  material_specification: '',
-  transfer_out_project_id: '',
-  transfer_in_project_id: '',
-  allocation_number: 1,
-  allocation_unit: '',
-  allocation_time: '',
-  allocation_responsible: '',
-  remarks: ''
-})
+const form = ref(getInitialFormData())
+const rules = generateRules()
 
-const rules = {
-  material_name: [{ required: true, message: '请输入物资名称', trigger: 'blur' }],
-  transfer_out_project_id: [{ required: true, message: '请选择调出项目', trigger: 'change' }],
-  transfer_in_project_id: [{ required: true, message: '请选择调入项目', trigger: 'change' }],
-  allocation_time: [{ required: true, message: '请选择调配时间', trigger: 'change' }],
-  allocation_responsible: [{ required: true, message: '请输入负责人', trigger: 'blur' }]
-}
+// ==================== API 调用 ====================
 
 const loadProjects = async () => {
   try {
@@ -181,11 +295,6 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
-}
-
-const getProjectName = (projectId) => {
-  const project = projectList.value.find(p => p.project_id === projectId)
-  return project ? project.project_name : '-'
 }
 
 const loadData = async () => {
@@ -217,18 +326,7 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = {
-    material_id: '',
-    material_name: '',
-    material_specification: '',
-    transfer_out_project_id: '',
-    transfer_in_project_id: '',
-    allocation_number: 1,
-    allocation_unit: '',
-    allocation_time: '',
-    allocation_responsible: '',
-    remarks: ''
-  }
+  form.value = getInitialFormData()
   dialogVisible.value = true
 }
 

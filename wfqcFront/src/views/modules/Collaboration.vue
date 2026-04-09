@@ -23,29 +23,29 @@
     </div>
     
     <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column label="所属项目" width="150">
+      <el-table-column 
+        v-for="column in tableColumns" 
+        :key="column.prop"
+        :prop="column.prop"
+        :label="column.label"
+        :width="column.width"
+        :fixed="column.fixed"
+      >
         <template #default="scope">
-          {{ getProjectName(scope.row.project_id) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="topic" label="主题" width="180" />
-      <el-table-column prop="initiator" label="发起人" width="120" />
-      <el-table-column prop="participants" label="参与人员" show-overflow-tooltip />
-      <el-table-column label="沟通时间" width="140">
-        <template #default="scope">
-          {{ scope.row.communication_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="communication_method" label="沟通方式" width="120" />
-      <el-table-column prop="content_summary" label="内容摘要" show-overflow-tooltip />
-      <el-table-column prop="is_solved" label="是否解决" width="100">
-        <template #default="scope">
-          <el-tag :type="scope.row.is_solved ? 'success' : 'info'">
-            {{ scope.row.is_solved ? '已解决' : '未解决' }}
+          <el-tag 
+            v-if="column.tagType" 
+            :type="column.tagType(scope.row[column.prop])"
+          >
+            {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
           </el-tag>
+          <span v-else-if="column.formatter">
+            {{ column.formatter(scope.row) }}
+          </span>
+          <span v-else>
+            {{ scope.row[column.prop] || '-' }}
+          </span>
         </template>
       </el-table-column>
-      <el-table-column prop="follow_up_person" label="跟进人" width="120" />
       <el-table-column label="操作" fixed="right" width="200">
         <template #default="scope">
           <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
@@ -71,48 +71,45 @@
       width="600px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="所属项目" prop="project_id">
-          <el-select v-model="form.project_id" placeholder="请选择项目" style="width: 100%;">
-            <el-option
-              v-for="proj in projectList"
-              :key="proj.project_id"
-              :label="proj.project_name"
-              :value="proj.project_id"
+        <el-form-item 
+          v-for="field in formFields" 
+          :key="field.prop"
+          :label="field.label" 
+          :prop="field.prop"
+        >
+          <el-input 
+            v-if="field.type === 'input'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+          />
+          <el-select 
+            v-else-if="field.type === 'select'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+            style="width: 100%;"
+          >
+            <el-option 
+              v-for="item in (field.optionsKey === 'projectList' ? projectList : field.options)" 
+              :key="item[field.optionValue || 'value']"
+              :label="item[field.optionLabel || 'label']" 
+              :value="item[field.optionValue || 'value']" 
             />
           </el-select>
-        </el-form-item>
-        <el-form-item label="主题" prop="topic">
-          <el-input v-model="form.topic" placeholder="请输入主题" />
-        </el-form-item>
-        <el-form-item label="发起人" prop="initiator">
-          <el-input v-model="form.initiator" placeholder="请输入发起人" />
-        </el-form-item>
-        <el-form-item label="参与人员" prop="participants">
-          <el-input v-model="form.participants" placeholder="请输入参与人员" />
-        </el-form-item>
-        <el-form-item label="沟通时间" prop="communication_time">
           <el-date-picker
-            v-model="form.communication_time"
-            type="date"
-            placeholder="请选择沟通时间"
+            v-else-if="field.type === 'date'"
+            v-model="form[field.prop]"
+            :type="field.dateType || 'date'"
+            :placeholder="field.placeholder"
             style="width: 100%;"
-            value-format="YYYY-MM-DD"
+            :value-format="field.valueFormat || 'YYYY-MM-DD'"
           />
-        </el-form-item>
-        <el-form-item label="沟通方式" prop="communication_method">
-          <el-input v-model="form.communication_method" placeholder="请输入沟通方式" />
-        </el-form-item>
-        <el-form-item label="内容摘要" prop="content_summary">
-          <el-input v-model="form.content_summary" type="textarea" :rows="3" placeholder="请输入内容摘要" />
-        </el-form-item>
-        <el-form-item label="是否解决" prop="is_solved">
-          <el-select v-model="form.is_solved" placeholder="请选择" style="width: 100%;">
-            <el-option label="是" :value="true" />
-            <el-option label="否" :value="false" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="跟进人" prop="follow_up_person">
-          <el-input v-model="form.follow_up_person" placeholder="请输入跟进人" />
+          <el-input 
+            v-else-if="field.type === 'textarea'"
+            v-model="form[field.prop]" 
+            type="textarea" 
+            :rows="field.rows || 3"
+            :placeholder="field.placeholder" 
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -130,6 +127,147 @@ import { Plus, Refresh } from '@element-plus/icons-vue'
 import { cooperationApi } from '@/api/cooperation'
 import { projectApi } from '@/api/project'
 
+// ==================== 配置常量区域 ====================
+
+const IS_SOLVED_CONFIG = {
+  true: { label: '已解决', type: 'success' },
+  false: { label: '未解决', type: 'info' }
+}
+
+const isSolvedOptions = [
+  { value: true, label: '是' },
+  { value: false, label: '否' }
+]
+
+const tableColumns = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    width: '150',
+    formatter: (row, projectList) => getProjectName(row.project_id, projectList)
+  },
+  { prop: 'topic', label: '主题', width: '180' },
+  { prop: 'initiator', label: '发起人', width: '120' },
+  { prop: 'participants', label: '参与人员', showOverflowTooltip: true },
+  { 
+    prop: 'communication_time', 
+    label: '沟通时间', 
+    width: '140',
+    formatter: (row) => row.communication_time || '-'
+  },
+  { prop: 'communication_method', label: '沟通方式', width: '120' },
+  { prop: 'content_summary', label: '内容摘要', showOverflowTooltip: true },
+  { 
+    prop: 'is_solved', 
+    label: '是否解决', 
+    width: '100',
+    tagType: (val) => IS_SOLVED_CONFIG[val]?.type || 'info',
+    formatter: (row) => IS_SOLVED_CONFIG[row.is_solved]?.label || '未知'
+  },
+  { prop: 'follow_up_person', label: '跟进人', width: '120' }
+]
+
+const formFields = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    type: 'select', 
+    placeholder: '请选择项目',
+    optionsKey: 'projectList',
+    optionLabel: 'project_name',
+    optionValue: 'project_id',
+    required: true
+  },
+  { 
+    prop: 'topic', 
+    label: '主题', 
+    type: 'input', 
+    placeholder: '请输入主题',
+    required: true
+  },
+  { 
+    prop: 'initiator', 
+    label: '发起人', 
+    type: 'input', 
+    placeholder: '请输入发起人',
+    required: true
+  },
+  { 
+    prop: 'participants', 
+    label: '参与人员', 
+    type: 'input', 
+    placeholder: '请输入参与人员'
+  },
+  { 
+    prop: 'communication_time', 
+    label: '沟通时间', 
+    type: 'date', 
+    placeholder: '请选择沟通时间',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD',
+    required: true
+  },
+  { 
+    prop: 'communication_method', 
+    label: '沟通方式', 
+    type: 'input', 
+    placeholder: '请输入沟通方式'
+  },
+  { 
+    prop: 'content_summary', 
+    label: '内容摘要', 
+    type: 'textarea', 
+    placeholder: '请输入内容摘要',
+    rows: 3
+  },
+  { 
+    prop: 'is_solved', 
+    label: '是否解决', 
+    type: 'select', 
+    placeholder: '请选择',
+    options: isSolvedOptions
+  },
+  { 
+    prop: 'follow_up_person', 
+    label: '跟进人', 
+    type: 'input', 
+    placeholder: '请输入跟进人'
+  }
+]
+
+const generateRules = () => {
+  const rules = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      rules[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+    }
+  })
+  return rules
+}
+
+const getInitialFormData = () => {
+  const formData = { coop_id: '' }
+  formFields.forEach(field => {
+    if (field.type === 'number') {
+      formData[field.prop] = field.min || 0
+    } else if (field.type === 'select') {
+      formData[field.prop] = field.options ? field.options[1]?.value : ''
+    } else {
+      formData[field.prop] = ''
+    }
+  })
+  return formData
+}
+
+// ==================== 辅助函数 ====================
+
+const getProjectName = (projectId, projectList) => {
+  const project = projectList?.find(p => p.project_id === projectId)
+  return project ? project.project_name : '-'
+}
+
+// ==================== 响应式数据 ====================
+
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
@@ -140,25 +278,10 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
-const form = ref({
-  coop_id: '',
-  project_id: '',
-  topic: '',
-  initiator: '',
-  participants: '',
-  communication_time: '',
-  communication_method: '',
-  content_summary: '',
-  is_solved: false,
-  follow_up_person: ''
-})
+const form = ref(getInitialFormData())
+const rules = generateRules()
 
-const rules = {
-  project_id: [{ required: true, message: '请选择项目', trigger: 'change' }],
-  topic: [{ required: true, message: '请输入主题', trigger: 'blur' }],
-  initiator: [{ required: true, message: '请输入发起人', trigger: 'blur' }],
-  communication_time: [{ required: true, message: '请选择沟通时间', trigger: 'change' }]
-}
+// ==================== API 调用 ====================
 
 const loadProjects = async () => {
   try {
@@ -169,11 +292,6 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
-}
-
-const getProjectName = (projectId) => {
-  const project = projectList.value.find(p => p.project_id === projectId)
-  return project ? project.project_name : '-'
 }
 
 const loadData = async () => {
@@ -202,18 +320,8 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = {
-    coop_id: '',
-    project_id: selectedProjectId.value || '',
-    topic: '',
-    initiator: '',
-    participants: '',
-    communication_time: '',
-    communication_method: '',
-    content_summary: '',
-    is_solved: false,
-    follow_up_person: ''
-  }
+  const initialForm = getInitialFormData()
+  form.value = { ...initialForm, project_id: selectedProjectId.value || '' }
   dialogVisible.value = true
 }
 

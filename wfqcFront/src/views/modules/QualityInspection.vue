@@ -23,31 +23,27 @@
     </div>
     
     <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column label="所属项目" width="150">
+      <el-table-column 
+        v-for="column in tableColumns" 
+        :key="column.prop"
+        :prop="column.prop"
+        :label="column.label"
+        :width="column.width"
+        :fixed="column.fixed"
+      >
         <template #default="scope">
-          {{ getProjectName(scope.row.project_id) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="inspection_item" label="检查项目" width="180" />
-      <el-table-column prop="inspection_standard" label="检查标准" width="180" />
-      <el-table-column label="检查结果" width="120">
-        <template #default="scope">
-          <el-tag :type="scope.row.inspection_result === 1 ? 'success' : 'danger'">
-            {{ scope.row.inspection_result === 1 ? '合格' : '不合格' }}
+          <el-tag 
+            v-if="column.tagType" 
+            :type="column.tagType(scope.row[column.prop])"
+          >
+            {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
           </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="inspector" label="检查人" width="120" />
-      <el-table-column label="检查时间" width="120">
-        <template #default="scope">
-          {{ scope.row.inspection_time || '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="rectification_requirement" label="整改要求" show-overflow-tooltip />
-      <el-table-column prop="rectification_responsible" label="整改负责人" width="120" />
-      <el-table-column label="整改完成时间" width="140">
-        <template #default="scope">
-          {{ scope.row.rectification_completion_time || '-' }}
+          <span v-else-if="column.formatter">
+            {{ column.formatter(scope.row) }}
+          </span>
+          <span v-else>
+            {{ scope.row[column.prop] || '-' }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="操作" fixed="right" width="200">
@@ -75,53 +71,44 @@
       width="600px"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="130px">
-        <el-form-item label="所属项目" prop="project_id">
-          <el-select v-model="form.project_id" placeholder="请选择项目" style="width: 100%;">
-            <el-option
-              v-for="proj in projectList"
-              :key="proj.project_id"
-              :label="proj.project_name"
-              :value="proj.project_id"
+        <el-form-item 
+          v-for="field in formFields" 
+          :key="field.prop"
+          :label="field.label" 
+          :prop="field.prop"
+        >
+          <el-input 
+            v-if="field.type === 'input'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+          />
+          <el-select 
+            v-else-if="field.type === 'select'"
+            v-model="form[field.prop]" 
+            :placeholder="field.placeholder" 
+            style="width: 100%;"
+          >
+            <el-option 
+              v-for="item in (field.optionsKey === 'projectList' ? projectList : field.options)" 
+              :key="item[field.optionValue || 'value']"
+              :label="item[field.optionLabel || 'label']" 
+              :value="item[field.optionValue || 'value']" 
             />
           </el-select>
-        </el-form-item>
-        <el-form-item label="检查项目" prop="inspection_item">
-          <el-input v-model="form.inspection_item" placeholder="请输入检查项目" />
-        </el-form-item>
-        <el-form-item label="检查标准" prop="inspection_standard">
-          <el-input v-model="form.inspection_standard" placeholder="请输入检查标准" />
-        </el-form-item>
-        <el-form-item label="检查结果" prop="inspection_result">
-          <el-select v-model="form.inspection_result" placeholder="请选择检查结果" style="width: 100%;">
-            <el-option label="合格" :value="1" />
-            <el-option label="不合格" :value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="检查人" prop="inspector">
-          <el-input v-model="form.inspector" placeholder="请输入检查人" />
-        </el-form-item>
-        <el-form-item label="检查时间" prop="inspection_time">
           <el-date-picker
-            v-model="form.inspection_time"
-            type="date"
-            placeholder="请选择检查时间"
+            v-else-if="field.type === 'date'"
+            v-model="form[field.prop]"
+            :type="field.dateType || 'date'"
+            :placeholder="field.placeholder"
             style="width: 100%;"
-            value-format="YYYY-MM-DD"
+            :value-format="field.valueFormat || 'YYYY-MM-DD'"
           />
-        </el-form-item>
-        <el-form-item label="整改要求" prop="rectification_requirement">
-          <el-input v-model="form.rectification_requirement" type="textarea" :rows="3" placeholder="请输入整改要求" />
-        </el-form-item>
-        <el-form-item label="整改负责人" prop="rectification_responsible">
-          <el-input v-model="form.rectification_responsible" placeholder="请输入整改负责人" />
-        </el-form-item>
-        <el-form-item label="整改完成时间" prop="rectification_completion_time">
-          <el-date-picker
-            v-model="form.rectification_completion_time"
-            type="date"
-            placeholder="请选择整改完成时间"
-            style="width: 100%;"
-            value-format="YYYY-MM-DD"
+          <el-input 
+            v-else-if="field.type === 'textarea'"
+            v-model="form[field.prop]" 
+            type="textarea" 
+            :rows="field.rows || 3"
+            :placeholder="field.placeholder" 
           />
         </el-form-item>
       </el-form>
@@ -140,6 +127,154 @@ import { Plus, Refresh } from '@element-plus/icons-vue'
 import { qualityInsApi } from '@/api/qualityIns'
 import { projectApi } from '@/api/project'
 
+// ==================== 配置常量区域 ====================
+
+const INSPECTION_RESULT_CONFIG = {
+  0: { label: '合格', type: 'success' },
+  1: { label: '不合格', type: 'danger' }
+}
+
+const inspectionResultOptions = [
+  { value: 1, label: '不合格' },
+  { value: 0, label: '合格' }
+]
+
+const tableColumns = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    width: '150',
+    formatter: (row, projectList) => getProjectName(row.project_id, projectList)
+  },
+  { prop: 'inspection_item', label: '检查项目', width: '180' },
+  { prop: 'inspection_standard', label: '检查标准', width: '180' },
+  { 
+    prop: 'inspection_result', 
+    label: '检查结果', 
+    width: '120',
+    tagType: (val) => INSPECTION_RESULT_CONFIG[val]?.type || 'info',
+    formatter: (row) => INSPECTION_RESULT_CONFIG[row.inspection_result]?.label || '未知'
+  },
+  { prop: 'inspector', label: '检查人', width: '120' },
+  { 
+    prop: 'inspection_time', 
+    label: '检查时间', 
+    width: '120',
+    formatter: (row) => row.inspection_time || '-'
+  },
+  { prop: 'rectification_requirement', label: '整改要求', showOverflowTooltip: true },
+  { prop: 'rectification_responsible', label: '整改负责人', width: '120' },
+  { 
+    prop: 'rectification_completion_time', 
+    label: '整改完成时间', 
+    width: '140',
+    formatter: (row) => row.rectification_completion_time || '-'
+  }
+]
+
+const formFields = [
+  { 
+    prop: 'project_id', 
+    label: '所属项目', 
+    type: 'select', 
+    placeholder: '请选择项目',
+    optionsKey: 'projectList',
+    optionLabel: 'project_name',
+    optionValue: 'project_id',
+    required: true
+  },
+  { 
+    prop: 'inspection_item', 
+    label: '检查项目', 
+    type: 'input', 
+    placeholder: '请输入检查项目',
+    required: true
+  },
+  { 
+    prop: 'inspection_standard', 
+    label: '检查标准', 
+    type: 'input', 
+    placeholder: '请输入检查标准',
+    required: true
+  },
+  { 
+    prop: 'inspection_result', 
+    label: '检查结果', 
+    type: 'select', 
+    placeholder: '请选择检查结果',
+    options: inspectionResultOptions,
+    required: true
+  },
+  { 
+    prop: 'inspector', 
+    label: '检查人', 
+    type: 'input', 
+    placeholder: '请输入检查人'
+  },
+  { 
+    prop: 'inspection_time', 
+    label: '检查时间', 
+    type: 'date', 
+    placeholder: '请选择检查时间',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD'
+  },
+  { 
+    prop: 'rectification_requirement', 
+    label: '整改要求', 
+    type: 'textarea', 
+    placeholder: '请输入整改要求',
+    rows: 3
+  },
+  { 
+    prop: 'rectification_responsible', 
+    label: '整改负责人', 
+    type: 'input', 
+    placeholder: '请输入整改负责人'
+  },
+  { 
+    prop: 'rectification_completion_time', 
+    label: '整改完成时间', 
+    type: 'date', 
+    placeholder: '请选择整改完成时间',
+    dateType: 'date',
+    valueFormat: 'YYYY-MM-DD'
+  }
+]
+
+const generateRules = () => {
+  const rules = {}
+  formFields.forEach(field => {
+    if (field.required) {
+      rules[field.prop] = [{ required: true, message: `请输入${field.label}`, trigger: field.type === 'select' ? 'change' : 'blur' }]
+    }
+  })
+  return rules
+}
+
+const getInitialFormData = () => {
+  const formData = { quality_id: '' }
+  formFields.forEach(field => {
+    if (field.type === 'number') {
+      formData[field.prop] = field.min || 0
+    } else if (field.type === 'select') {
+      formData[field.prop] = field.options ? field.options[0]?.value : ''
+    } else {
+      formData[field.prop] = ''
+    }
+  })
+  return formData
+}
+
+// ==================== 辅助函数 ====================
+
+const getProjectName = (projectId, projectList) => {
+  const project = projectList?.find(p => p.project_id === projectId)
+  return project ? project.project_name : '-'
+}
+
+// ==================== 响应式数据 ====================
+
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
@@ -150,25 +285,10 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref(null)
-const form = ref({
-  quality_id: '',
-  project_id: '',
-  inspection_item: '',
-  inspection_standard: '',
-  inspection_result: 1,
-  inspector: '',
-  inspection_time: '',
-  rectification_requirement: '',
-  rectification_responsible: '',
-  rectification_completion_time: ''
-})
+const form = ref(getInitialFormData())
+const rules = generateRules()
 
-const rules = {
-  project_id: [{ required: true, message: '请选择项目', trigger: 'change' }],
-  inspection_item: [{ required: true, message: '请输入检查项目', trigger: 'blur' }],
-  inspection_standard: [{ required: true, message: '请输入检查标准', trigger: 'blur' }],
-  inspection_result: [{ required: true, message: '请选择检查结果', trigger: 'change' }]
-}
+// ==================== API 调用 ====================
 
 const loadProjects = async () => {
   try {
@@ -179,11 +299,6 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
-}
-
-const getProjectName = (projectId) => {
-  const project = projectList.value.find(p => p.project_id === projectId)
-  return project ? project.project_name : '-'
 }
 
 const loadData = async () => {
@@ -212,18 +327,8 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = {
-    quality_id: '',
-    project_id: selectedProjectId.value || '',
-    inspection_item: '',
-    inspection_standard: '',
-    inspection_result: 1,
-    inspector: '',
-    inspection_time: '',
-    rectification_requirement: '',
-    rectification_responsible: '',
-    rectification_completion_time: ''
-  }
+  const initialForm = getInitialFormData()
+  form.value = { ...initialForm, project_id: selectedProjectId.value || '' }
   dialogVisible.value = true
 }
 

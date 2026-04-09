@@ -40,14 +40,26 @@ export const authApi = {
     })
   },
   
-  // 重置密码
-  resetPassword(data) {
+
+  // resetPassword(data) {
+  //   return request({
+  //     url: '/auth/resetPassword',
+  //     method: 'post',
+  //     data
+  //   })
+  // },
+  
+  //忘记密码 手机短信验证重置密码
+  forgetPassword(data) {
     return request({
-      url: '/auth/resetPassword',
+      url: '/auth/forgetPassword',
       method: 'post',
       data
     })
   },
+
+
+
   
   // 刷新Token（通常由拦截器自动调用）
   refreshToken() {

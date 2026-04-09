@@ -4,9 +4,12 @@
     <div class="header-user">
       <el-dropdown @command="handleCommand">
         <span class="el-dropdown-link">
-          <el-icon><User /></el-icon>
-          <span class="username">{{ username }}</span>
-          <el-icon class="el-icon--right"><arrow-down /></el-icon>
+          <div class="user-avatar" v-if="userInfo.icon && avatarUrl">
+            <img :src="avatarUrl" alt="用户头像" />
+          </div>
+          <el-icon v-else><User /></el-icon>
+          <span class="username">{{ userInfo.nick_name || '用户' }}</span>
+          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
@@ -21,20 +24,59 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { User, ArrowDown } from '@element-plus/icons-vue'
+import { userApi } from '@/api/user'
+import { fileApi } from '@/api/file'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
-const username = ref('用户')
+const userInfo = ref({
+  nick_name: '',
+  icon: ''
+})
+
+const avatarUrl = ref('')
+
+const loadAvatarUrl = async (fileId) => {
+  if (fileId) {
+    try {
+      const response = await fileApi.fileUrlsGen({ files_id: [fileId] })
+      if (response.success && response.data && response.data.length > 0) {
+        avatarUrl.value = response.data[0].oss_url
+      }
+    } catch (error) {
+      console.error('获取头像URL失败:', error)
+    }
+  }
+}
+
+const loadUserInfo = async () => {
+  if (authStore.userId) {
+    try {
+      const response = await userApi.userDetail({ user_id: authStore.userId })
+      if (response.success) {
+        userInfo.value = {
+          nick_name: response.data.nick_name,
+          icon: response.data.icon
+        }
+        if (response.data.icon) {
+          await loadAvatarUrl(response.data.icon)
+        }
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+    }
+  }
+}
 
 const handleCommand = (command) => {
   switch (command) {
     case 'profile':
-      router.push('/profile')
+      router.push('/userSettings')
       break
     case 'settings':
       router.push('/settings')
@@ -49,6 +91,10 @@ const handleLogout = async () => {
   await authStore.logout()
   router.push('/login')
 }
+
+onMounted(() => {
+  loadUserInfo()
+})
 </script>
 
 <style scoped>
@@ -95,5 +141,19 @@ const handleLogout = async () => {
 
 .el-icon--right {
   font-size: 12px;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 8px;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 </style>

@@ -93,6 +93,16 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     
+    // 忘记密码
+    async forgetPassword(data) {
+      try {
+        const res = await authApi.forgetPassword(data)
+        return res
+      } catch (error) {
+        return { success: false, message: error.message || '重置失败' }
+      }
+    },
+    
     // 登出
     async logout() {
       try {

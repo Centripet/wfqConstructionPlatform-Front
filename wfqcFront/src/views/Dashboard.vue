@@ -14,7 +14,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import SidebarMenu from '@/components/SidebarMenu.vue'
 import ContentArea from '@/components/ContentArea.vue'
 
-const activeMenu = ref('personnel')
+const activeMenu = ref('project')
 
 const handleMenuSelect = (menu) => {
   activeMenu.value = menu

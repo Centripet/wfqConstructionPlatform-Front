@@ -12,6 +12,7 @@
 <script setup>
 import { computed, defineProps } from 'vue'
 import ProjectOverview from '@/views/modules/ProjectOverview.vue'
+import PersonnelManagement from '@/views/modules/PersonnelManagement.vue'
 import EquipmentManagement from '@/views/modules/EquipmentManagement.vue'
 import ProgressTracking from '@/views/modules/ProgressTracking.vue'
 import QualityInspection from '@/views/modules/QualityInspection.vue'
@@ -44,7 +45,7 @@ const menuTitles = {
 
 const menuComponents = {
   project: ProjectOverview,
-  personnel: PlaceholderModule,
+  personnel: PersonnelManagement,
   equipment: EquipmentManagement,
   progress: ProgressTracking,
   quality: QualityInspection,

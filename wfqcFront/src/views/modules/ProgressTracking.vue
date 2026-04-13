@@ -1,74 +1,76 @@
 <template>
   <div class="progress-tracking">
-    <div class="search-bar">
-      <el-select v-model="selectedProjectId" placeholder="请选择项目" clearable @change="loadData">
-        <el-option
-          v-for="proj in projectList"
-          :key="proj.project_id"
-          :label="proj.project_name"
-          :value="proj.project_id"
-        />
-      </el-select>
-    </div>
-    
     <div class="toolbar">
       <el-button type="primary" @click="handleAdd">
         <el-icon><Plus /></el-icon>
         添加进度
       </el-button>
-      <el-button @click="loadData">
-        <el-icon><Refresh /></el-icon>
-        刷新
-      </el-button>
+      <div class="toolbar-right">
+        <el-button @click="showAdvancedSearch = true">
+          <el-icon><Search /></el-icon>
+          高级搜索
+        </el-button>
+        <el-button @click="loadData">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+        <el-button @click="showExportDialog = true">
+          <el-icon><Download /></el-icon>
+          导出Excel
+        </el-button>
+      </div>
     </div>
     
-    <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column 
-        v-for="column in tableColumns" 
-        :key="column.prop"
-        :prop="column.prop"
-        :label="column.label"
-        :width="column.width"
-        :fixed="column.fixed"
-      >
-        <template #default="scope">
-          <el-progress 
-            v-if="column.type === 'progress'" 
-            :percentage="scope.row[column.prop] || 0" 
-            :stroke-width="10" 
-          />
-          <el-tag 
-            v-else-if="column.tagType" 
-            :type="column.tagType(scope.row[column.prop])"
-          >
-            {{ scope.row[column.prop] || '-' }}
-          </el-tag>
-          <span v-else-if="column.formatter">
-            {{ column.formatter(scope.row) }}
-          </span>
-          <span v-else>
-            {{ scope.row[column.prop] || '-' }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" fixed="right" width="200">
-        <template #default="scope">
-          <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="content-wrapper">
+      <el-table :data="tableData" style="width: 100%" v-loading="loading">
+        <el-table-column 
+          v-for="column in tableColumns" 
+          :key="column.prop"
+          :prop="column.prop"
+          :label="column.label"
+          :width="column.width"
+          :fixed="column.fixed"
+        >
+          <template #default="scope">
+            <el-progress 
+              v-if="column.type === 'progress'" 
+              :percentage="scope.row[column.prop] || 0" 
+              :stroke-width="10" 
+            />
+            <el-tag 
+              v-else-if="column.tagType" 
+              :type="column.tagType(scope.row[column.prop])"
+            >
+              {{ scope.row[column.prop] || '-' }}
+            </el-tag>
+            <span v-else-if="column.formatter">
+              {{ column.formatter(scope.row) }}
+            </span>
+            <span v-else>
+              {{ scope.row[column.prop] || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" fixed="right" width="200">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
     
-    <el-pagination
-      v-model:current-page="currentPage"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50, 100]"
-      :total="total"
-      layout="total, sizes, prev, pager, next, jumper"
-      @size-change="loadData"
-      @current-change="loadData"
-      style="margin-top: 20px; justify-content: flex-end; display: flex;"
-    />
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="loadData"
+        @current-change="loadData"
+      />
+    </div>
     
     <el-dialog
       v-model="dialogVisible"
@@ -130,15 +132,34 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+    
+    <AdvancedSearch
+      v-model:visible="showAdvancedSearch"
+      title="进度跟踪高级搜索"
+      :search-fields="getSearchFieldsWithOptions()"
+      @search="handleSearch"
+    />
+    
+    <ExportDialog
+      v-model:visible="showExportDialog"
+      :total="total"
+      :page-size="pageSize"
+      :columns="exportColumns"
+      :fetch-page-data="fetchExportData"
+      default-filename="进度跟踪"
+      @close="showExportDialog = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { projectProgressApi } from '@/api/projectProgress'
 import { projectApi } from '@/api/project'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
+import ExportDialog from '@/components/ExportDialog.vue'
 
 // ==================== 配置常量区域 ====================
 
@@ -148,6 +169,23 @@ const TASK_STATUS_CONFIG = {
   '滞后': 'warning',
   '暂停': 'info'
 }
+
+const taskStatusOptions = [
+  { value: '已完成', label: '已完成' },
+  { value: '进行中', label: '进行中' },
+  { value: '滞后', label: '滞后' },
+  { value: '暂停', label: '暂停' }
+]
+
+const searchFields = [
+  { prop: 'project_id', label: '所属项目', type: 'select', placeholder: '请选择项目', optionsKey: 'projectList', optionLabel: 'project_name', optionValue: 'project_id' },
+  { prop: 'task_name', label: '任务名称', type: 'input', placeholder: '请输入任务名称' },
+  { prop: 'task_status', label: '任务状态', type: 'select', placeholder: '请选择任务状态', options: taskStatusOptions },
+  { prop: 'responsible_person', label: '负责人', type: 'input', placeholder: '请输入负责人' },
+  { prop: 'start_date', label: '开始日期', type: 'date', placeholder: '请选择开始日期' },
+  { prop: 'end_date', label: '结束日期', type: 'date', placeholder: '请选择结束日期' },
+  { prop: 'progress', label: '进度百分比', type: 'number', placeholder: '请输入进度百分比' }
+]
 
 const tableColumns = [
   { 
@@ -316,7 +354,6 @@ const getProjectName = (projectId, projectList) => {
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
-const selectedProjectId = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -325,6 +362,45 @@ const isEdit = ref(false)
 const formRef = ref(null)
 const form = ref(getInitialFormData())
 const rules = generateRules()
+
+const showAdvancedSearch = ref(false)
+const searchParams = ref({})
+const showExportDialog = ref(false)
+
+const exportColumns = [
+  { prop: 'project_id', label: '所属项目', formatter: (row) => getProjectName(row.project_id, projectList.value) },
+  { prop: 'task_name', label: '任务名称' },
+  { prop: 'plan_start_time', label: '计划开始', formatter: (row) => row.plan_start_time || '-' },
+  { prop: 'plan_end_time', label: '计划结束', formatter: (row) => row.plan_end_time || '-' },
+  { prop: 'actual_start_time', label: '实际开始', formatter: (row) => row.actual_start_time || '-' },
+  { prop: 'actual_end_time', label: '实际结束', formatter: (row) => row.actual_end_time || '-' },
+  { prop: 'progress_percentage', label: '进度(%)' },
+  { prop: 'responsible_person', label: '负责人' },
+  { prop: 'status', label: '状态' },
+  { prop: 'lag_reason', label: '滞后原因' }
+]
+
+const fetchExportData = async (page, size) => {
+  const params = {
+    page,
+    size,
+    ...searchParams.value
+  }
+  const res = await projectProgressApi.projectProgressList(params)
+  if (res.success) {
+    return res.data?.records || []
+  }
+  return []
+}
+
+const getSearchFieldsWithOptions = () => {
+  return searchFields.map(field => {
+    if (field.optionsKey === 'projectList') {
+      return { ...field, options: projectList.value.map(p => ({ value: p.project_id, label: p.project_name })) }
+    }
+    return field
+  })
+}
 
 // ==================== API 调用 ====================
 
@@ -344,10 +420,8 @@ const loadData = async () => {
   try {
     const params = {
       page: currentPage.value,
-      size: pageSize.value
-    }
-    if (selectedProjectId.value) {
-      params.project_id = selectedProjectId.value
+      size: pageSize.value,
+      ...searchParams.value
     }
     const res = await projectProgressApi.projectProgressList(params)
     if (res.success) {
@@ -363,10 +437,16 @@ const loadData = async () => {
   }
 }
 
+const handleSearch = (params) => {
+  searchParams.value = params
+  currentPage.value = 1
+  loadData()
+}
+
 const handleAdd = () => {
   isEdit.value = false
   const initialForm = getInitialFormData()
-  form.value = { ...initialForm, project_id: selectedProjectId.value || '' }
+  form.value = { ...initialForm, project_id: searchParams.value.project_id || '' }
   dialogVisible.value = true
 }
 
@@ -438,6 +518,14 @@ onMounted(() => {
   padding: 20px;
   background-color: #fff;
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+.content-wrapper {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .search-bar {
@@ -452,5 +540,25 @@ onMounted(() => {
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
+  justify-content: space-between;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
+}
+
+:deep(.el-table__cell) {
+  padding: 12px 0;
+  height: 50px;
+  line-height: 26px;
 }
 </style>

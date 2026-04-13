@@ -177,6 +177,14 @@ export const useAuthStore = defineStore('auth', {
           if (savedUserId) {
             this.userId = savedUserId
           }
+          // 从响应头中获取新的accessToken
+          if (res.headers) {
+            const authorization = res.headers.authorization || res.headers.Authorization
+            if (authorization) {
+              this.accessToken = authorization
+              sessionStorage.setItem('accessToken', authorization)
+            }
+          }
           // 启动Token过期倒计时
           this.startTokenExpireTimer()
           return true

@@ -1,73 +1,74 @@
 <template>
   <div class="project-overview">
-    <div class="search-bar">
-      <el-input v-model="searchKeyword" placeholder="搜索项目名称或地点" style="width: 300px; margin-right: 10px;" clearable />
-      <el-select v-model="searchStatus" placeholder="请选择状态" clearable style="width: 200px;">
-        <el-option 
-          v-for="item in statusOptions" 
-          :key="item.value"
-          :label="item.label" 
-          :value="item.value" 
-        />
-      </el-select>
-    </div>
-    
     <div class="toolbar">
       <el-button type="primary" @click="handleAdd">
         <el-icon><Plus /></el-icon>
         新增项目
       </el-button>
-      <el-button @click="loadData">
-        <el-icon><Refresh /></el-icon>
-        刷新
-      </el-button>
+      <div class="toolbar-right">
+        <el-button @click="showAdvancedSearch = true">
+          <el-icon><Search /></el-icon>
+          高级搜索
+        </el-button>
+        <el-button @click="loadData">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+        <el-button @click="showExportDialog = true">
+          <el-icon><Download /></el-icon>
+          导出Excel
+        </el-button>
+      </div>
     </div>
     
-    <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <!-- 动态生成表格列 -->
-      <el-table-column 
-        v-for="column in tableColumns" 
-        :key="column.prop"
-        :prop="column.prop"
-        :label="column.label"
-        :width="column.width"
-        :fixed="column.fixed"
-      >
-        <template #default="scope">
-          <!-- 支持单位后缀显示 -->
-          <span v-if="column.suffix">
-            {{ formatValueWithSuffix(scope.row[column.prop], column) }}
-          </span>
-          <!-- 支持自定义格式化函数 -->
-          <span v-else-if="column.formatter">
-            {{ column.formatter(scope.row) }}
-          </span>
-          <!-- 默认显示 -->
-          <span v-else>
-            {{ scope.row[column.prop] || '-' }}
-          </span>
-        </template>
-      </el-table-column>
-      
-      <!-- 操作列单独处理 -->
-      <el-table-column label="操作" fixed="right" width="200">
-        <template #default="scope">
-          <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="content-wrapper">
+      <el-table :data="tableData" style="width: 100%" v-loading="loading">
+        <!-- 动态生成表格列 -->
+        <el-table-column 
+          v-for="column in tableColumns" 
+          :key="column.prop"
+          :prop="column.prop"
+          :label="column.label"
+          :width="column.width"
+          :fixed="column.fixed"
+        >
+          <template #default="scope">
+            <!-- 支持单位后缀显示 -->
+            <span v-if="column.suffix">
+              {{ formatValueWithSuffix(scope.row[column.prop], column) }}
+            </span>
+            <!-- 支持自定义格式化函数 -->
+            <span v-else-if="column.formatter">
+              {{ column.formatter(scope.row) }}
+            </span>
+            <!-- 默认显示 -->
+            <span v-else>
+              {{ scope.row[column.prop] || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        
+        <!-- 操作列单独处理 -->
+        <el-table-column label="操作" fixed="right" width="200">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
     
-    <el-pagination
-      v-model:current-page="currentPage"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50, 100]"
-      :total="total"
-      layout="total, sizes, prev, pager, next, jumper"
-      @size-change="loadData"
-      @current-change="loadData"
-      style="margin-top: 20px; justify-content: flex-end; display: flex;"
-    />
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="loadData"
+        @current-change="loadData"
+      />
+    </div>
     
     <el-dialog
       v-model="dialogVisible"
@@ -125,14 +126,33 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+    
+    <AdvancedSearch
+      v-model:visible="showAdvancedSearch"
+      title="项目概览高级搜索"
+      :search-fields="searchFields"
+      @search="handleSearch"
+    />
+    
+    <ExportDialog
+      v-model:visible="showExportDialog"
+      :total="total"
+      :page-size="pageSize"
+      :columns="exportColumns"
+      :fetch-page-data="fetchExportData"
+      default-filename="项目总览"
+      @close="showExportDialog = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { projectApi } from '@/api/project'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
+import ExportDialog from '@/components/ExportDialog.vue'
 
 // ==================== 配置常量区域 ====================
 
@@ -152,6 +172,16 @@ const statusOptions = Object.entries(STATUS_CONFIG).map(([value, config]) => ({
   value: Number(value),
   label: config.label
 }))
+
+// 高级搜索字段配置
+const searchFields = [
+  { prop: 'project_name', label: '项目名称', type: 'input', placeholder: '请输入项目名称' },
+  { prop: 'cp_project_place', label: '项目地点', type: 'input', placeholder: '请输入项目地点' },
+  { prop: 'cp_project_status', label: '项目状态', type: 'select', placeholder: '请选择项目状态', options: statusOptions },
+  { prop: 'cp_project_manager', label: '项目经理', type: 'input', placeholder: '请输入项目经理' },
+  { prop: 'cp_start_date', label: '开始日期', type: 'date', placeholder: '请选择开始日期' },
+  { prop: 'cp_expected_completion_date', label: '预计完成日期', type: 'date', placeholder: '请选择预计完成日期' }
+]
 
 // 表格列配置
 const tableColumns = [
@@ -335,8 +365,6 @@ const getStatusText = (status) => {
 
 const loading = ref(false)
 const tableData = ref([])
-const searchKeyword = ref('')
-const searchStatus = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -346,6 +374,35 @@ const formRef = ref(null)
 const form = ref(getInitialFormData())
 const rules = generateRules()
 
+const showAdvancedSearch = ref(false)
+const searchParams = ref({})
+const showExportDialog = ref(false)
+
+const exportColumns = [
+  { prop: 'project_name', label: '项目名称' },
+  { prop: 'cp_project_place', label: '项目地点' },
+  { prop: 'cp_project_status', label: '项目状态', formatter: (row) => STATUS_CONFIG[row.cp_project_status]?.label || '未知' },
+  { prop: 'cp_project_manager', label: '项目经理' },
+  { prop: 'cp_start_date', label: '开始日期', formatter: (row) => row.cp_start_date || '-' },
+  { prop: 'cp_expected_completion_date', label: '预计完成', formatter: (row) => row.cp_expected_completion_date || '-' },
+  { prop: 'cp_actual_completion_date', label: '实际完成', formatter: (row) => row.cp_actual_completion_date || '-' },
+  { prop: 'cp_project_budget', label: '项目预算', formatter: (row) => `${row.cp_project_budget || 0} 万元` },
+  { prop: 'cp_invested_funds', label: '已投入资金', formatter: (row) => `${row.cp_invested_funds || 0} 万元` }
+]
+
+const fetchExportData = async (page, size) => {
+  const params = {
+    page,
+    size,
+    ...searchParams.value
+  }
+  const res = await projectApi.projectList(params)
+  if (res.success) {
+    return res.data?.records || []
+  }
+  return []
+}
+
 // ==================== API 调用 ====================
 
 const loadData = async () => {
@@ -353,13 +410,8 @@ const loadData = async () => {
   try {
     const params = {
       page: currentPage.value,
-      size: pageSize.value
-    }
-    if (searchKeyword.value) {
-      params.project_name = searchKeyword.value
-    }
-    if (searchStatus.value !== '') {
-      params.cp_project_status = searchStatus.value
+      size: pageSize.value,
+      ...searchParams.value
     }
     const res = await projectApi.projectList(params)
     if (res.success) {
@@ -373,6 +425,12 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = (params) => {
+  searchParams.value = params
+  currentPage.value = 1
+  loadData()
 }
 
 const handleAdd = () => {
@@ -449,6 +507,14 @@ onMounted(() => {
   padding: 20px;
   background-color: #fff;
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+.content-wrapper {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .search-bar {
@@ -461,6 +527,26 @@ onMounted(() => {
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
+  justify-content: space-between;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
+}
+
+:deep(.el-table__cell) {
+  padding: 12px 0;
+  height: 50px;
+  line-height: 26px;
 }
 
 /* 表格中数字列右对齐优化 */

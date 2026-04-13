@@ -8,67 +8,72 @@
       @field-change="handleFieldChange"
     />
     
-    <div class="search-bar">
-      <el-input v-model="searchKeyword" placeholder="搜索姓名/工号" style="width: 300px;" clearable @keyup.enter="loadData" />
-      <el-button type="primary" @click="loadData" style="margin-left: 10px;">
-        <el-icon><Search /></el-icon>
-        搜索
-      </el-button>
-    </div>
-    
     <div class="toolbar">
       <el-button type="primary" @click="handleAdd">
         <el-icon><Plus /></el-icon>
         添加人员
       </el-button>
-      <el-button @click="loadData">
-        <el-icon><Refresh /></el-icon>
-        刷新
-      </el-button>
+      <div class="toolbar-right">
+        <el-button @click="showAdvancedSearch = true">
+          <el-icon><Search /></el-icon>
+          高级搜索
+        </el-button>
+        <el-button @click="loadData">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+        <el-button @click="showExportDialog = true">
+          <el-icon><Download /></el-icon>
+          导出Excel
+        </el-button>
+      </div>
     </div>
     
-    <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column 
-        v-for="column in tableColumns" 
-        :key="column.prop"
-        :prop="column.prop"
-        :label="column.label"
-        :width="column.width"
-        :fixed="column.fixed"
-      >
-        <template #default="scope">
-          <el-tag 
-            v-if="column.tagType" 
-            :type="column.tagType(scope.row[column.prop])"
-          >
-            {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
-          </el-tag>
-          <span v-else-if="column.formatter">
-            {{ column.formatter(scope.row) }}
-          </span>
-          <span v-else>
-            {{ scope.row[column.prop] || '-' }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" fixed="right" width="200">
-        <template #default="scope">
-          <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="content-wrapper">
+      <el-table :data="tableData" style="width: 100%" v-loading="loading">
+        <el-table-column 
+          v-for="column in tableColumns" 
+          :key="column.prop"
+          :prop="column.prop"
+          :label="column.label"
+          :width="column.width"
+          :fixed="column.fixed"
+        >
+          <template #default="scope">
+            <el-tag 
+              v-if="column.tagType" 
+              :type="column.tagType(scope.row[column.prop])"
+            >
+              {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
+            </el-tag>
+            <span v-else-if="column.formatter">
+              {{ column.formatter(scope.row) }}
+            </span>
+            <span v-else>
+              {{ scope.row[column.prop] || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" fixed="right" width="200">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
     
-    <el-pagination
-      v-model:current-page="currentPage"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50, 100]"
-      :total="total"
-      layout="total, sizes, prev, pager, next, jumper"
-      @size-change="loadData"
-      @current-change="loadData"
-      style="margin-top: 20px; justify-content: flex-end; display: flex;"
-    />
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="loadData"
+        @current-change="loadData"
+      />
+    </div>
     
     <el-dialog
       v-model="dialogVisible"
@@ -137,16 +142,35 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+    
+    <AdvancedSearch
+      v-model:visible="showAdvancedSearch"
+      title="人员高级搜索"
+      :search-fields="searchFields"
+      @search="handleSearch"
+    />
+    
+    <ExportDialog
+      v-model:visible="showExportDialog"
+      :total="total"
+      :page-size="pageSize"
+      :columns="exportColumns"
+      :fetch-page-data="fetchExportData"
+      default-filename="人员管理"
+      @close="showExportDialog = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { personApi } from '@/api/person'
 import { userApi } from '@/api/user'
 import PieChart from '@/components/PieChart.vue'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
+import ExportDialog from '@/components/ExportDialog.vue'
 
 const PERMISSION_LEVEL_CONFIG = {
   1: { label: '初级', type: 'info' },
@@ -158,6 +182,16 @@ const permissionLevelOptions = Object.entries(PERMISSION_LEVEL_CONFIG).map(([val
   value: Number(value),
   label: config.label
 }))
+
+const searchFields = [
+  { prop: 'employee_id', label: '工号', type: 'input', placeholder: '请输入工号' },
+  { prop: 'person_name', label: '姓名', type: 'input', placeholder: '请输入姓名' },
+  { prop: 'role', label: '角色/岗位', type: 'input', placeholder: '请输入角色/岗位' },
+  { prop: 'department', label: '所属部门', type: 'input', placeholder: '请输入所属部门' },
+  { prop: 'contact', label: '联系方式', type: 'input', placeholder: '请输入联系方式' },
+  { prop: 'hire_date', label: '入职时间', type: 'date', placeholder: '请选择入职时间' },
+  { prop: 'permission_level', label: '权限等级', type: 'select', placeholder: '请选择权限等级', options: permissionLevelOptions }
+]
 
 const tableColumns = [
   { prop: 'employee_id', label: '工号', width: '120' },
@@ -296,7 +330,6 @@ const getUserName = (userId) => {
 const loading = ref(false)
 const tableData = ref([])
 const userList = ref([])
-const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -307,6 +340,35 @@ const form = ref(getInitialFormData())
 const rules = generateRules()
 const chartData = ref([])
 const currentField = ref('role')
+
+const showAdvancedSearch = ref(false)
+const searchParams = ref({})
+const showExportDialog = ref(false)
+
+const exportColumns = [
+  { prop: 'employee_id', label: '工号' },
+  { prop: 'person_name', label: '姓名' },
+  { prop: 'role', label: '角色/岗位' },
+  { prop: 'department', label: '所属部门' },
+  { prop: 'contact', label: '联系方式' },
+  { prop: 'hire_date', label: '入职时间', formatter: (row) => row.hire_date || '-' },
+  { prop: 'permission_level', label: '权限等级', formatter: (row) => PERMISSION_LEVEL_CONFIG[row.permission_level]?.label || '-' },
+  { prop: 'user_id', label: '关联用户', formatter: (row) => getUserName(row.user_id) },
+  { prop: 'create_time', label: '创建时间', formatter: (row) => formatDateTime(row.create_time) }
+]
+
+const fetchExportData = async (page, size) => {
+  const params = {
+    page,
+    size,
+    ...searchParams.value
+  }
+  const res = await personApi.personList(params)
+  if (res.success) {
+    return res.data?.records || []
+  }
+  return []
+}
 
 const fieldOptions = [
   { label: '角色', value: 'role' },
@@ -345,7 +407,8 @@ const loadData = async () => {
   try {
     const params = {
       page: currentPage.value,
-      size: pageSize.value
+      size: pageSize.value,
+      ...searchParams.value
     }
     const res = await personApi.personList(params)
     if (res.success) {
@@ -354,11 +417,18 @@ const loadData = async () => {
     } else {
       ElMessage.error(res.message || '加载数据失败')
     }
+    await loadChartData()
   } catch {
     ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = (params) => {
+  searchParams.value = params
+  currentPage.value = 1
+  loadData()
 }
 
 const handleAdd = () => {
@@ -436,6 +506,14 @@ onMounted(() => {
   padding: 20px;
   background-color: #fff;
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+.content-wrapper {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .search-bar {
@@ -448,5 +526,25 @@ onMounted(() => {
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
+  justify-content: space-between;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
+}
+
+:deep(.el-table__cell) {
+  padding: 12px 0;
+  height: 50px;
+  line-height: 26px;
 }
 </style>

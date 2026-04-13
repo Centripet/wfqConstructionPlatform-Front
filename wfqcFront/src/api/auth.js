@@ -81,7 +81,8 @@ export const authApi = {
   refreshTokenVerify() {
     return request({
       url: '/auth/refreshTokenVerify',
-      method: 'post'
+      method: 'post',
+      returnFullResponse: true
     })
   }
 }

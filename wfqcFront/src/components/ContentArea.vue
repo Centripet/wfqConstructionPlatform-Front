@@ -1,8 +1,8 @@
 <template>
   <div class="content-area">
-    <div class="content-header">
+    <!-- <div class="content-header">
       <h2>{{ currentTitle }}</h2>
-    </div>
+    </div> -->
     <div class="content-body">
       <component :is="currentComponent" :module-name="currentTitle" />
     </div>

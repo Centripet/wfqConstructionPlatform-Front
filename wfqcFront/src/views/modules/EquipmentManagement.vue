@@ -8,71 +8,72 @@
       @field-change="handleFieldChange"
     />
     
-    <div class="search-bar">
-      <el-select v-model="selectedProjectId" placeholder="请选择项目" clearable @change="loadData">
-        <el-option
-          v-for="proj in projectList"
-          :key="proj.project_id"
-          :label="proj.project_name"
-          :value="proj.project_id"
-        />
-      </el-select>
-      <el-input v-model="searchKeyword" placeholder="搜索设备名称" style="width: 300px; margin-left: 10px;" clearable />
-    </div>
-    
     <div class="toolbar">
       <el-button type="primary" @click="handleAdd">
         <el-icon><Plus /></el-icon>
         添加设备
       </el-button>
-      <el-button @click="loadData">
-        <el-icon><Refresh /></el-icon>
-        刷新
-      </el-button>
+      <div class="toolbar-right">
+        <el-button @click="showAdvancedSearch = true">
+          <el-icon><Search /></el-icon>
+          高级搜索
+        </el-button>
+        <el-button @click="loadData">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+        <el-button @click="showExportDialog = true">
+          <el-icon><Download /></el-icon>
+          导出Excel
+        </el-button>
+      </div>
     </div>
     
-    <el-table :data="tableData" style="width: 100%" v-loading="loading">
-      <el-table-column 
-        v-for="column in tableColumns" 
-        :key="column.prop"
-        :prop="column.prop"
-        :label="column.label"
-        :width="column.width"
-        :fixed="column.fixed"
-      >
-        <template #default="scope">
-          <el-tag 
-            v-if="column.tagType" 
-            :type="column.tagType(scope.row[column.prop])"
-          >
-            {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
-          </el-tag>
-          <span v-else-if="column.formatter">
-            {{ column.formatter(scope.row) }}
-          </span>
-          <span v-else>
-            {{ scope.row[column.prop] || '-' }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" fixed="right" width="200">
-        <template #default="scope">
-          <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="content-wrapper">
+      <el-table :data="tableData" style="width: 100%" v-loading="loading">
+        <el-table-column 
+          v-for="column in tableColumns" 
+          :key="column.prop"
+          :prop="column.prop"
+          :label="column.label"
+          :width="column.width"
+          :fixed="column.fixed"
+        >
+          <template #default="scope">
+            <el-tag 
+              v-if="column.tagType" 
+              :type="column.tagType(scope.row[column.prop])"
+            >
+              {{ column.formatter ? column.formatter(scope.row) : (scope.row[column.prop] || '-') }}
+            </el-tag>
+            <span v-else-if="column.formatter">
+              {{ column.formatter(scope.row) }}
+            </span>
+            <span v-else>
+              {{ scope.row[column.prop] || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" fixed="right" width="200">
+          <template #default="scope">
+            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
     
-    <el-pagination
-      v-model:current-page="currentPage"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50, 100]"
-      :total="total"
-      layout="total, sizes, prev, pager, next, jumper"
-      @size-change="loadData"
-      @current-change="loadData"
-      style="margin-top: 20px; justify-content: flex-end; display: flex;"
-    />
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="loadData"
+        @current-change="loadData"
+      />
+    </div>
     
     <el-dialog
       v-model="dialogVisible"
@@ -127,16 +128,35 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+    
+    <AdvancedSearch
+      v-model:visible="showAdvancedSearch"
+      title="设备高级搜索"
+      :search-fields="getSearchFieldsWithOptions()"
+      @search="handleSearch"
+    />
+    
+    <ExportDialog
+      v-model:visible="showExportDialog"
+      :total="total"
+      :page-size="pageSize"
+      :columns="exportColumns"
+      :fetch-page-data="fetchExportData"
+      default-filename="设备监控"
+      @close="showExportDialog = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { projectApi } from '@/api/project'
 import PieChart from '@/components/PieChart.vue'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
+import ExportDialog from '@/components/ExportDialog.vue'
 
 // ==================== 配置常量区域 ====================
 
@@ -163,6 +183,18 @@ const deviceStatusOptions = Object.entries(DEVICE_STATUS_CONFIG).map(([value, co
 const alarmStatusOptions = [
   { value: 0, label: '正常' },
   { value: 1, label: '告警' }
+]
+
+const searchFields = [
+  { prop: 'project_id', label: '所属项目', type: 'select', placeholder: '请选择项目', optionsKey: 'projectList', optionLabel: 'project_name', optionValue: 'project_id' },
+  { prop: 'device_name', label: '设备名称', type: 'input', placeholder: '请输入设备名称' },
+  { prop: 'device_type', label: '设备类型', type: 'input', placeholder: '请输入设备类型' },
+  { prop: 'device_status', label: '设备状态', type: 'select', placeholder: '请选择设备状态', options: deviceStatusOptions },
+  { prop: 'device_location', label: '设备位置', type: 'input', placeholder: '请输入设备位置' },
+  { prop: 'running_time', label: '运行时间', type: 'date', placeholder: '请选择运行时间' },
+  { prop: 'battery', label: '电量(%)', type: 'number', min: 0, max: 100 },
+  { prop: 'alarm_status', label: '报警状态', type: 'select', placeholder: '请选择报警状态', options: alarmStatusOptions },
+  { prop: 'last_maintenance_time', label: '上次维护时间', type: 'date', placeholder: '请选择上次维护时间' }
 ]
 
 const tableColumns = [
@@ -318,8 +350,6 @@ const getProjectName = (projectId, projectList) => {
 const loading = ref(false)
 const tableData = ref([])
 const projectList = ref([])
-const selectedProjectId = ref('')
-const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -330,6 +360,45 @@ const form = ref(getInitialFormData())
 const rules = generateRules()
 const chartData = ref([])
 const currentField = ref('device_type')
+
+const showAdvancedSearch = ref(false)
+const searchParams = ref({})
+const showExportDialog = ref(false)
+
+const exportColumns = [
+  { prop: 'project_id', label: '所属项目', formatter: (row) => getProjectName(row.project_id, projectList.value) },
+  { prop: 'device_name', label: '设备名称' },
+  { prop: 'device_type', label: '设备类型' },
+  { prop: 'device_status', label: '设备状态', formatter: (row) => DEVICE_STATUS_CONFIG[row.device_status]?.label || '未知' },
+  { prop: 'device_location', label: '设备位置' },
+  { prop: 'running_time', label: '运行时间', formatter: (row) => row.running_time || '-' },
+  { prop: 'battery', label: '电量(%)' },
+  { prop: 'temperature', label: '温度(°C)' },
+  { prop: 'alarm_status', label: '报警状态', formatter: (row) => ALARM_STATUS_CONFIG[row.alarm_status]?.label || '未知' },
+  { prop: 'last_maintenance_time', label: '上次维护', formatter: (row) => row.last_maintenance_time || '-' }
+]
+
+const fetchExportData = async (page, size) => {
+  const params = {
+    page,
+    size,
+    ...searchParams.value
+  }
+  const res = await deviceApi.deviceList(params)
+  if (res.success) {
+    return res.data?.records || []
+  }
+  return []
+}
+
+const getSearchFieldsWithOptions = () => {
+  return searchFields.map(field => {
+    if (field.optionsKey === 'projectList') {
+      return { ...field, options: projectList.value.map(p => ({ value: p.project_id, label: p.project_name })) }
+    }
+    return field
+  })
+}
 
 const fieldOptions = [
   { label: '设备名称', value: 'device_name' },
@@ -371,10 +440,8 @@ const loadData = async () => {
   try {
     const params = {
       page: currentPage.value,
-      size: pageSize.value
-    }
-    if (selectedProjectId.value) {
-      params.project_id = selectedProjectId.value
+      size: pageSize.value,
+      ...searchParams.value
     }
     const res = await deviceApi.deviceList(params)
     if (res.success) {
@@ -383,11 +450,18 @@ const loadData = async () => {
     } else {
       ElMessage.error(res.message || '加载数据失败')
     }
+    await loadChartData()
   } catch {
     ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = (params) => {
+  searchParams.value = params
+  currentPage.value = 1
+  loadData()
 }
 
 const handleAdd = () => {
@@ -466,6 +540,14 @@ onMounted(() => {
   padding: 20px;
   background-color: #fff;
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+.content-wrapper {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .search-bar {
@@ -482,5 +564,25 @@ onMounted(() => {
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
+  justify-content: space-between;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
+}
+
+:deep(.el-table__cell) {
+  padding: 12px 0;
+  height: 50px;
+  line-height: 26px;
 }
 </style>

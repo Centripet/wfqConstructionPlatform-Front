@@ -1,8 +1,5 @@
 <template>
   <div class="sidebar">
-    <div class="sidebar-header">
-      <h3>项目总览</h3>
-    </div>
     <el-menu
       :default-active="activeMenu"
       class="sidebar-menu"

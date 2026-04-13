@@ -179,7 +179,7 @@ const handleAvatarChange = (file) => {
 
 const loadUserInfo = async () => {
   try {
-    const response = await userApi.userDetail({ user_id: authStore.userId })
+    const response = await userApi.userSelfDetail()
     if (response.success) {
       userInfo.value = response.data
       userForm.user_id = response.data.user_id

@@ -19,12 +19,11 @@ export const userApi = {
     })
   },
   
-  // 用户信息
-  userDetail: (params) => {
+  // 用户个人信息
+  userSelfDetail: () => {
     return request({
-      url: '/user/userDetail',
-      method: 'get',
-      params
+      url: '/user/userSelfDetail',
+      method: 'get'
     })
   },
 

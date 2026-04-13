@@ -55,21 +55,19 @@ const loadAvatarUrl = async (fileId) => {
 }
 
 const loadUserInfo = async () => {
-  if (authStore.userId) {
-    try {
-      const response = await userApi.userDetail({ user_id: authStore.userId })
-      if (response.success) {
-        userInfo.value = {
-          nick_name: response.data.nick_name,
-          icon: response.data.icon
-        }
-        if (response.data.icon) {
-          await loadAvatarUrl(response.data.icon)
-        }
+  try {
+    const response = await userApi.userSelfDetail()
+    if (response.success) {
+      userInfo.value = {
+        nick_name: response.data.nick_name,
+        icon: response.data.icon
       }
-    } catch (error) {
-      console.error('获取用户信息失败:', error)
+      if (response.data.icon) {
+        await loadAvatarUrl(response.data.icon)
+      }
     }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
   }
 }
 

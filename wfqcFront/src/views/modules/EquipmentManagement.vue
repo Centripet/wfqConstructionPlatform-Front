@@ -191,7 +191,7 @@ const searchFields = [
   { prop: 'device_type', label: '设备类型', type: 'input', placeholder: '请输入设备类型' },
   { prop: 'device_status', label: '设备状态', type: 'select', placeholder: '请选择设备状态', options: deviceStatusOptions },
   { prop: 'device_location', label: '设备位置', type: 'input', placeholder: '请输入设备位置' },
-  { prop: 'running_time', label: '运行时间', type: 'date', placeholder: '请选择运行时间' },
+  { prop: 'running_time', label: '运行时间(小时)', type: 'number', min: 0, placeholder: '请输入运行时间' },
   { prop: 'battery', label: '电量(%)', type: 'number', min: 0, max: 100 },
   { prop: 'alarm_status', label: '报警状态', type: 'select', placeholder: '请选择报警状态', options: alarmStatusOptions },
   { prop: 'last_maintenance_time', label: '上次维护时间', type: 'date', placeholder: '请选择上次维护时间' }
@@ -218,7 +218,7 @@ const tableColumns = [
     prop: 'running_time', 
     label: '运行时间', 
     width: '120',
-    formatter: (row) => row.running_time || '-'
+    formatter: (row) => row.running_time !== undefined && row.running_time !== null ? `${Math.floor(row.running_time)} 小时` : '-'
   },
   { prop: 'battery', label: '电量(%)', width: '100' },
   { prop: 'temperature', label: '温度(°C)', width: '120' },
@@ -276,11 +276,10 @@ const formFields = [
   },
   { 
     prop: 'running_time', 
-    label: '运行时间', 
-    type: 'date', 
-    placeholder: '请选择运行时间',
-    dateType: 'date',
-    valueFormat: 'YYYY-MM-DD'
+    label: '运行时间(小时)', 
+    type: 'number', 
+    min: 0,
+    placeholder: '请输入运行时间'
   },
   { 
     prop: 'battery', 
@@ -371,7 +370,7 @@ const exportColumns = [
   { prop: 'device_type', label: '设备类型' },
   { prop: 'device_status', label: '设备状态', formatter: (row) => DEVICE_STATUS_CONFIG[row.device_status]?.label || '未知' },
   { prop: 'device_location', label: '设备位置' },
-  { prop: 'running_time', label: '运行时间', formatter: (row) => row.running_time || '-' },
+  { prop: 'running_time', label: '运行时间', formatter: (row) => row.running_time !== undefined && row.running_time !== null ? `${Math.floor(row.running_time)} 小时` : '-' },
   { prop: 'battery', label: '电量(%)' },
   { prop: 'temperature', label: '温度(°C)' },
   { prop: 'alarm_status', label: '报警状态', formatter: (row) => ALARM_STATUS_CONFIG[row.alarm_status]?.label || '未知' },

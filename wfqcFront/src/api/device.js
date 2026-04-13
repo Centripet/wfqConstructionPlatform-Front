@@ -39,5 +39,13 @@ export const deviceApi = {
       method: 'post',
       data
     })
+  },
+  
+  deviceCount(data) {
+    return request({
+      url: '/Device/deviceCount',
+      method: 'post',
+      data
+    })
   }
 }

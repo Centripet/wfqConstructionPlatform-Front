@@ -39,5 +39,13 @@ export const safetyEventApi = {
       method: 'post',
       data
     })
+  },
+  
+  safetyEventCount(data) {
+    return request({
+      url: '/SafetyEvent/safetyEventCount',
+      method: 'post',
+      data
+    })
   }
 }

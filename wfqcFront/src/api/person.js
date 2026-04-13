@@ -39,5 +39,13 @@ export const personApi = {
       method: 'post',
       data
     })
+  },
+  
+  personCount(data) {
+    return request({
+      url: '/person/personCount',
+      method: 'post',
+      data
+    })
   }
 }

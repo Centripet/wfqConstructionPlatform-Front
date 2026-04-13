@@ -144,7 +144,7 @@ export const useAuthStore = defineStore('auth', {
       // AccessToken有效期1小时，提前5秒刷新
       this.tokenExpireTimer = setTimeout(() => {
         this.refreshTokenSilently()
-      }, 55 * 60 * 1000) // 55分钟后尝试刷新
+      }, 25 * 60 * 1000) // 分钟后尝试刷新
     },
     
     // 静默刷新Token

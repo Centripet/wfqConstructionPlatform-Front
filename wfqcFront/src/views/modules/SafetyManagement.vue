@@ -1,5 +1,13 @@
 <template>
   <div class="safety-management">
+    <PieChart 
+      :data="chartData" 
+      :size="220"
+      :field-options="fieldOptions"
+      :default-field="'event_level'"
+      @field-change="handleFieldChange"
+    />
+    
     <div class="search-bar">
       <el-select v-model="selectedProjectId" placeholder="请选择项目" clearable @change="loadData">
         <el-option
@@ -127,6 +135,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { safetyEventApi } from '@/api/safetyEvent'
 import { projectApi } from '@/api/project'
+import PieChart from '@/components/PieChart.vue'
 
 // ==================== 配置常量区域 ====================
 
@@ -320,6 +329,14 @@ const isEdit = ref(false)
 const formRef = ref(null)
 const form = ref(getInitialFormData())
 const rules = generateRules()
+const chartData = ref([])
+const currentField = ref('event_level')
+
+const fieldOptions = [
+  { label: '事件名称', value: 'event_name' },
+  { label: '事件等级', value: 'event_level' },
+  { label: '处理状态', value: 'processing_status' }
+]
 
 // ==================== API 调用 ====================
 
@@ -332,6 +349,34 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
+}
+
+const loadChartData = async (field = currentField.value) => {
+  try {
+    const res = await safetyEventApi.safetyEventCount({ field })
+    if (res.success) {
+      const levelConfig = {
+        0: '一般',
+        1: '严重',
+        2: '重大'
+      }
+      chartData.value = (res.data || []).map(item => {
+        const name = item[field] || item.event_level_label || levelConfig[item.event_level] || `等级${item.event_level}` || '未知'
+        return {
+          ...item,
+          name: typeof name === 'number' ? `等级${name}` : name,
+          count: item.count || 0
+        }
+      })
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+const handleFieldChange = (field) => {
+  currentField.value = field
+  loadChartData(field)
 }
 
 const loadData = async () => {
@@ -425,6 +470,7 @@ const handleDelete = (row) => {
 onMounted(() => {
   loadProjects()
   loadData()
+  loadChartData()
 })
 </script>
 

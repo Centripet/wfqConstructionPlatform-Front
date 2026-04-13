@@ -1,5 +1,13 @@
 <template>
   <div class="personnel-management">
+    <PieChart 
+      :data="chartData" 
+      :size="220"
+      :field-options="fieldOptions"
+      :default-field="'role'"
+      @field-change="handleFieldChange"
+    />
+    
     <div class="search-bar">
       <el-input v-model="searchKeyword" placeholder="搜索姓名/工号" style="width: 300px;" clearable @keyup.enter="loadData" />
       <el-button type="primary" @click="loadData" style="margin-left: 10px;">
@@ -138,6 +146,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { personApi } from '@/api/person'
 import { userApi } from '@/api/user'
+import PieChart from '@/components/PieChart.vue'
 
 const PERMISSION_LEVEL_CONFIG = {
   1: { label: '初级', type: 'info' },
@@ -296,6 +305,13 @@ const isEdit = ref(false)
 const formRef = ref(null)
 const form = ref(getInitialFormData())
 const rules = generateRules()
+const chartData = ref([])
+const currentField = ref('role')
+
+const fieldOptions = [
+  { label: '角色', value: 'role' },
+  { label: '部门', value: 'department' }
+]
 
 const loadUsers = async () => {
   try {
@@ -306,6 +322,22 @@ const loadUsers = async () => {
   } catch (error) {
     console.error('加载用户列表失败:', error)
   }
+}
+
+const loadChartData = async (field = currentField.value) => {
+  try {
+    const res = await personApi.personCount({ field })
+    if (res.success) {
+      chartData.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+const handleFieldChange = (field) => {
+  currentField.value = field
+  loadChartData(field)
 }
 
 const loadData = async () => {
@@ -395,6 +427,7 @@ const handleDelete = (row) => {
 onMounted(() => {
   loadUsers()
   loadData()
+  loadChartData()
 })
 </script>
 

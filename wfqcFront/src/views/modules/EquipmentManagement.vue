@@ -1,5 +1,13 @@
 <template>
   <div class="equipment-management">
+    <PieChart 
+      :data="chartData" 
+      :size="220"
+      :field-options="fieldOptions"
+      :default-field="'device_type'"
+      @field-change="handleFieldChange"
+    />
+    
     <div class="search-bar">
       <el-select v-model="selectedProjectId" placeholder="请选择项目" clearable @change="loadData">
         <el-option
@@ -128,6 +136,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { deviceApi } from '@/api/device'
 import { projectApi } from '@/api/project'
+import PieChart from '@/components/PieChart.vue'
 
 // ==================== 配置常量区域 ====================
 
@@ -319,6 +328,14 @@ const isEdit = ref(false)
 const formRef = ref(null)
 const form = ref(getInitialFormData())
 const rules = generateRules()
+const chartData = ref([])
+const currentField = ref('device_type')
+
+const fieldOptions = [
+  { label: '设备名称', value: 'device_name' },
+  { label: '设备类型', value: 'device_type' },
+  { label: '设备状态', value: 'device_status' }
+]
 
 // ==================== API 调用 ====================
 
@@ -331,6 +348,22 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('加载项目列表失败:', error)
   }
+}
+
+const loadChartData = async (field = currentField.value) => {
+  try {
+    const res = await deviceApi.deviceCount({ field })
+    if (res.success) {
+      chartData.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+const handleFieldChange = (field) => {
+  currentField.value = field
+  loadChartData(field)
 }
 
 const loadData = async () => {
@@ -424,6 +457,7 @@ const handleDelete = (row) => {
 onMounted(() => {
   loadProjects()
   loadData()
+  loadChartData()
 })
 </script>
 

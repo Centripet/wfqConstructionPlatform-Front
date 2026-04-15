@@ -1,20 +1,24 @@
 <template>
   <div class="avatar-uploader">
-    <div class="upload-area" @click="openUploadDialog">
+    <div 
+      class="upload-area" 
+      :class="{ disabled: isDisabled }"
+      @click="handleUploadAreaClick"
+    >
       <div v-if="!currentFile" class="upload-placeholder">
         <el-icon class="upload-icon" :size="48"><Camera /></el-icon>
-        <div class="upload-text">点击上传头像</div>
+        <div class="upload-text">{{ isDisabled ? '请点击修改按钮' : '点击上传头像' }}</div>
         <div class="upload-tip">支持 jpg/jpeg/png 格式，最大2MB</div>
       </div>
       <div v-else class="avatar-preview">
         <img :src="avatarUrl" alt="用户头像" class="avatar-img" />
-        <div class="avatar-overlay">
-          <el-button type="primary" link @click.stop="openUploadDialog">
+        <div class="avatar-overlay" :class="{ disabled: isDisabled }">
+          <el-button type="primary" link @click.stop="handleReuploadClick">
             <el-icon><Refresh /></el-icon> 重新上传
           </el-button>
-          <el-button type="danger" link @click.stop="handleDelete">
+          <!-- <el-button type="danger" link @click.stop="handleDeleteClick">
             <el-icon><Delete /></el-icon> 删除
-          </el-button>
+          </el-button> -->
         </div>
       </div>
     </div>
@@ -26,6 +30,7 @@
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       @closed="handleDialogClosed"
+      draggable
     >
       <FileUploader
         ref="uploaderRef"
@@ -56,6 +61,10 @@ const props = defineProps({
   modelValue: {
     type: Object,
     default: null
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -65,6 +74,8 @@ const uploadDialogVisible = ref(false)
 const uploaderRef = ref(null)
 const currentFile = ref(props.modelValue)
 const avatarUrl = ref('')
+
+const isDisabled = computed(() => props.disabled)
 
 const loadAvatarUrl = async (fileId) => {
   if (fileId) {
@@ -80,7 +91,29 @@ const loadAvatarUrl = async (fileId) => {
 }
 
 const openUploadDialog = () => {
+  console.log('openUploadDialog called, isDisabled:', isDisabled.value)
   uploadDialogVisible.value = true
+}
+
+const handleUploadAreaClick = () => {
+  if (!isDisabled.value) {
+    console.log('handleUploadAreaClick called')
+    openUploadDialog()
+  }
+}
+
+const handleReuploadClick = () => {
+  if (!isDisabled.value) {
+    console.log('handleReuploadClick called')
+    openUploadDialog()
+  }
+}
+
+const handleDeleteClick = () => {
+  if (!isDisabled.value) {
+    console.log('handleDeleteClick called')
+    handleDelete()
+  }
 }
 
 const handleUploadSuccess = (files) => {
@@ -197,6 +230,7 @@ watch(() => props.modelValue, (newValue) => {
   gap: 8px;
   opacity: 0;
   transition: opacity 0.3s;
+  pointer-events: auto;
 }
 
 .avatar-preview:hover .avatar-overlay {
@@ -206,5 +240,19 @@ watch(() => props.modelValue, (newValue) => {
 .avatar-overlay .el-button {
   color: #fff;
   font-size: 12px;
+}
+
+.upload-area.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.upload-area.disabled:hover {
+  border-color: #dcdfe6;
+  background: transparent;
+}
+
+.avatar-overlay.disabled {
+  display: none;
 }
 </style>

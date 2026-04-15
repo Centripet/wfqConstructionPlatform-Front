@@ -5,6 +5,7 @@
     width="400px"
     :close-on-click-modal="false"
     @update:model-value="handleClose"
+    draggable
   >
     <el-form :model="form" label-width="120px">
       <el-form-item label="导出页数">

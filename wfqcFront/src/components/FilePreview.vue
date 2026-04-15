@@ -6,6 +6,7 @@
       width="80%"
       :fullscreen="isFullscreen"
       destroy-on-close
+      draggable
     >
       <template #header>
         <div class="dialog-header">

@@ -79,6 +79,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑设备' : '添加设备'"
       width="600px"
+      draggable
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <el-form-item 

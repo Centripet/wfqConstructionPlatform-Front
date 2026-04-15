@@ -71,6 +71,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑检查' : '添加检查'"
       width="600px"
+      draggable
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="130px">
         <el-form-item 

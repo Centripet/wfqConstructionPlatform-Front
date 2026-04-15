@@ -5,6 +5,7 @@
     :title="title"
     width="600px"
     :before-close="handleClose"
+    draggable
   >
     <el-form :model="searchForm" ref="formRef" label-width="120px">
       <el-form-item 

@@ -49,6 +49,7 @@
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       @closed="handleDialogClosed"
+      draggable
     >
       <FileUploader
         ref="uploaderRef"

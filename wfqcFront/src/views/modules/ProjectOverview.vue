@@ -74,6 +74,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑项目' : '新增项目'"
       width="600px"
+      draggable
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <!-- 动态生成表单字段 -->

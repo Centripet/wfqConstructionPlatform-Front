@@ -17,14 +17,17 @@
         </template>
         
         <div class="user-info-form">
-          <div class="form-row">
+          <div class="avatar-row">
             <div class="avatar-upload-section">
               <AvatarUploader
                 v-model="avatarFile"
                 @update:modelValue="handleAvatarChange"
+                :disabled="!isEditing"
               />
             </div>
-            
+          </div>
+          
+          <div class="form-row">
             <div class="form-fields">
               <el-form :model="userForm" label-width="100px" :disabled="!isEditing" class="user-form">
                 <el-row :gutter="20">
@@ -332,6 +335,12 @@ onMounted(() => {
   padding: 30px 20px;
 }
 
+.avatar-row {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
 .form-row {
   display: flex;
   gap: 60px;
@@ -366,13 +375,14 @@ onMounted(() => {
 
 /* 响应式布局 */
 @media (max-width: 768px) {
+  .avatar-row {
+    display: flex;
+    justify-content: center;
+  }
+  
   .form-row {
     flex-direction: column;
     gap: 30px;
-  }
-  
-  .avatar-upload-section {
-    align-self: center;
   }
   
   .el-row {

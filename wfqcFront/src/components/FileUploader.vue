@@ -11,6 +11,7 @@
       :on-change="handleChange"
       :on-remove="handleRemove"
       :on-exceed="handleExceed"
+      :http-request="handleHttpRequest"
       drag
     >
       <el-icon class="el-icon--upload"><upload-filled /></el-icon>
@@ -22,15 +23,13 @@
           {{ tipText }}
         </div>
       </template>
-    </el-upload>
-
-    <div v-if="fileList.length > 0" class="upload-progress">
-      <div v-for="file in fileList" :key="file.uid" class="progress-item">
+      <template #file="{ file }">
         <div class="file-info">
           <span class="file-name">{{ file.name }}</span>
           <span class="file-size">{{ formatFileSize(file.size) }}</span>
         </div>
         <el-progress
+          v-if="file.status === 'uploading'"
           :percentage="file.progress || 0"
           :status="getProgressStatus(file)"
         />
@@ -40,8 +39,8 @@
           <span v-else-if="file.status === 'uploading'" class="uploading-text">上传中...</span>
           <span v-else>等待上传</span>
         </div>
-      </div>
-    </div>
+      </template>
+    </el-upload>
 
     <div v-if="fileList.length > 0" class="upload-actions">
       <el-button type="primary" @click="startUpload" :disabled="uploading || fileList.length === 0" :loading="uploading">
@@ -217,7 +216,6 @@ const startUpload = async () => {
 
     emit('update:modelValue', uploadResults.value)
     emit('success', uploadResults.value)
-    ElMessage.success('上传成功')
   } catch (error) {
     emit('error', error)
     ElMessage.error(error.message || '上传失败')
@@ -245,17 +243,6 @@ defineExpose({
 <style scoped>
 .file-uploader {
   width: 100%;
-}
-
-.upload-progress {
-  margin-top: 20px;
-}
-
-.progress-item {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #f5f7fa;
-  border-radius: 4px;
 }
 
 .file-info {

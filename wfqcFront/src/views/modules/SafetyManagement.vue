@@ -79,6 +79,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑事件' : '添加事件'"
       width="600px"
+      draggable
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="130px">
         <el-form-item 

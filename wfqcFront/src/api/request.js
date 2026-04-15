@@ -3,7 +3,7 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: window.appConfig?.API_BASE_URL || '/api',
   timeout: 15000,
   withCredentials: true
 })
@@ -89,7 +89,7 @@ request.interceptors.response.use(
             console.log('检测到403，尝试刷新token')
             // 直接调用axios请求refresh token，避免使用request造成循环调用
             const refreshResponse = await axios.post(
-              `${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/refresh`,
+              `${window.appConfig?.API_BASE_URL || '/api'}/auth/refresh`,
               {},
               { withCredentials: true }
             )

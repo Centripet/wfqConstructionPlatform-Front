@@ -65,6 +65,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑图纸' : '添加图纸'"
       width="600px"
+      draggable
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <el-form-item 

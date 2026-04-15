@@ -71,6 +71,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑协同' : '添加协同'"
       width="600px"
+      draggable
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <el-form-item 
